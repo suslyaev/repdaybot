@@ -80,7 +80,7 @@ def create_challenge(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.ChallengeDetail:
-    end_date = payload.start_date + (payload.duration_days - 1)
+    end_date = payload.start_date + timedelta(days=payload.duration_days - 1)
 
     # Простой invite_code
     import secrets
