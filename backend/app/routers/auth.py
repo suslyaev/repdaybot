@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import os
 import time
+import re
 from urllib.parse import parse_qsl, unquote
 
 from fastapi import APIRouter, HTTPException
@@ -37,24 +38,35 @@ def _validate_init_data(init_data: str) -> dict:
         print("WARNING: BOT_TOKEN not set, skipping validation (dev mode)")
         return dict(parse_qsl(init_data, keep_blank_values=True))
 
-    data = dict(parse_qsl(init_data, keep_blank_values=True))
-    hash_received = data.pop("hash", None)
-    if not hash_received:
+    # Извлекаем hash из оригинальной строки
+    hash_match = re.search(r'hash=([^&]+)', init_data)
+    if not hash_match:
         raise HTTPException(status_code=400, detail="hash missing in init_data")
-
-    # Исключаем signature из проверки (это отдельное поле, не участвует в валидации)
-    data.pop("signature", None)
-
-    # Формируем строку для проверки (сортируем по ключу, включаем все значения)
-    # Важно: значения должны быть в том же виде, как пришли (URL-encoded или декодированные)
-    # По документации Telegram, нужно использовать оригинальные значения из query string
-    data_check_arr = [f"{k}={v}" for k, v in sorted(data.items())]
-    data_check_string = "\n".join(data_check_arr)
+    hash_received = hash_match.group(1)
     
-    # Логируем для отладки (первые 200 символов)
+    # Парсим данные для использования в коде
+    data = dict(parse_qsl(init_data, keep_blank_values=True))
+    
+    # Формируем строку для проверки из оригинальной строки
+    # Извлекаем все параметры кроме hash и signature, сохраняя их в оригинальном URL-encoded виде
+    pairs = []
+    for part in init_data.split('&'):
+        if '=' in part:
+            key, value = part.split('=', 1)
+            # Используем ключ и значение как есть (URL-encoded)
+            if key not in ('hash', 'signature'):
+                pairs.append((key, value))
+    
+    # Сортируем по ключу и формируем строку для проверки
+    pairs.sort(key=lambda x: x[0])
+    data_check_string = '\n'.join(f"{k}={v}" for k, v in pairs)
+    
+    print(f"Pairs count: {len(pairs)}, keys: {[k for k, _ in pairs]}")
+    
+    # Логируем для отладки
     print(f"Data check string preview: {data_check_string[:200]}...")
     print(f"Hash received: {hash_received[:16]}...")
-    print(f"Data keys after removing hash and signature: {list(data.keys())}")
+    print(f"Data keys: {sorted(data.keys())}")
 
     # Вычисляем секретный ключ: HMAC-SHA256(bot_token, "WebAppData")
     secret_key = hmac.new(
