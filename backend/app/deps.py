@@ -4,10 +4,12 @@ from fastapi import Depends, HTTPException, Header, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+import os
+
 from .db import SessionLocal
 from .models import User
 
-SECRET_KEY = "change-me-in-env"
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-env")
 ALGORITHM = "HS256"
 
 

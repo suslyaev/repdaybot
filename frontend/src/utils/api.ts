@@ -6,7 +6,7 @@ import type {
   UserMe,
 } from "./types";
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = import.meta.env.PROD ? "/api" : "http://localhost:8000";
 
 let authState: AuthState | null = null;
 
