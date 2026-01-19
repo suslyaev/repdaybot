@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
@@ -379,10 +379,15 @@ def get_stats(
 @router.post("/{challenge_id}/nudge")
 def send_nudge(
     challenge_id: int,
-    to_user_id: int,
+    to_user_id: int = Query(..., description="ID пользователя, которому отправляется nudge"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> dict:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Nudge request: from_user={current_user.id}, to_user={to_user_id}, challenge={challenge_id}")
+    
     if current_user.id == to_user_id:
         raise HTTPException(status_code=400, detail="cannot nudge self")
 
@@ -423,13 +428,19 @@ def send_nudge(
     )
     db.add(nudge)
     db.commit()
+    logger.info(f"Nudge saved to database: id={nudge.id}")
 
-    telegram_bot.send_nudge_message(
-        db=db,
-        to_user_id=to_user_id,
-        from_user_id=current_user.id,
-        challenge_id=challenge_id,
-    )
+    try:
+        telegram_bot.send_nudge_message(
+            db=db,
+            to_user_id=to_user_id,
+            from_user_id=current_user.id,
+            challenge_id=challenge_id,
+        )
+        logger.info(f"Telegram message sent successfully")
+    except Exception as e:
+        logger.error(f"Failed to send Telegram message: {e}")
+        # Не падаем, если сообщение не отправилось - nudge уже сохранён
 
     return {"ok": True}
 

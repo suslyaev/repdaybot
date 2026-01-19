@@ -211,7 +211,19 @@ export const ChallengePage: React.FC<Props> = ({
                 {p.id !== currentUserId && (
                   <button
                     className="ghost-button"
-                    onClick={() => void api.sendNudge(challenge.id, p.id)}
+                    onClick={async () => {
+                      try {
+                        await api.sendNudge(challenge.id, p.id);
+                        // Можно показать уведомление, но для MVP просто тихо
+                      } catch (e) {
+                        const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
+                        if (errorMsg.includes("429")) {
+                          alert("Слишком часто! Можно пнуть не чаще раза в час.");
+                        } else {
+                          alert(`Ошибка: ${errorMsg}`);
+                        }
+                      }
+                    }}
                   >
                     Пнуть
                   </button>
