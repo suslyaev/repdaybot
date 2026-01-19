@@ -26,18 +26,25 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    В проде требуем корректный JWT в Authorization: Bearer <token>.
-    В dev-режиме (нет TELEGRAM_BOT_TOKEN) позволяем работать без заголовка,
-    автоматом создавая/используя первого пользователя.
+    Получение текущего пользователя из JWT токена.
+    В dev-режиме (SKIP_INIT_DATA_VALIDATION=true или нет TELEGRAM_BOT_TOKEN)
+    пропускаем проверку подписи и используем fallback при ошибках.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
     )
 
-    # Dev-режим: если нет Authorization и нет TELEGRAM_BOT_TOKEN — создаём/используем dev user
+    # Определяем dev-режим
+    is_dev_mode = (
+        not os.getenv("TELEGRAM_BOT_TOKEN") or 
+        os.getenv("SKIP_INIT_DATA_VALIDATION", "").lower() == "true"
+    )
+
+    # Если нет токена
     if authorization is None or not authorization.startswith("Bearer "):
-        if not os.getenv("TELEGRAM_BOT_TOKEN"):
+        if is_dev_mode:
+            # В dev-режиме используем первого пользователя или создаем нового
             user = db.query(User).first()
             if not user:
                 user = User(
@@ -49,42 +56,64 @@ def get_current_user(
                 db.commit()
                 db.refresh(user)
             return user
-        # В проде заголовок обязателен
         raise credentials_exception
 
     token = authorization.removeprefix("Bearer ").strip()
-    is_dev_mode = not os.getenv("TELEGRAM_BOT_TOKEN")
 
     # Пробуем декодировать JWT
     user_id: int | None = None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        print(f"JWT decoded successfully: user_id={user_id}")
-    except JWTError as e:
-        print(f"JWT decode error: {e}")
-        # В dev-режиме: если токен невалидный, пробуем декодировать без проверки подписи
-        if is_dev_mode:
-            try:
-                payload_unsafe = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
-                user_id = payload_unsafe.get("sub")
-                print(f"JWT decoded without signature check: user_id={user_id}")
-            except Exception as e2:
-                print(f"JWT decode without signature also failed: {e2}")
-                pass
-        else:
-            # В проде - строгая валидация
+    
+    if is_dev_mode:
+        # В dev-режиме всегда декодируем без проверки подписи
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
+            user_id = payload.get("sub")
+            print(f"Dev mode: JWT decoded without signature check, user_id={user_id}")
+        except Exception as e:
+            print(f"Dev mode: Failed to decode JWT even without signature check: {e}")
+            # Fallback: используем первого пользователя
+            user = db.query(User).first()
+            if not user:
+                user = User(telegram_id=0, username="dev", display_name="Dev User")
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            return user
+    else:
+        # В проде - строгая валидация
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+        except JWTError:
             raise credentials_exception
 
     if user_id is None:
-        print("ERROR: Could not extract user_id from token")
+        if is_dev_mode:
+            # Fallback в dev-режиме
+            user = db.query(User).first()
+            if not user:
+                user = User(telegram_id=0, username="dev", display_name="Dev User")
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            return user
         raise credentials_exception
 
     # Используем пользователя из токена
     user = db.get(User, user_id)
     if user is None:
-        # Пользователя с таким ID нет - это критическая ошибка
-        print(f"ERROR: User with id={user_id} from token not found in database")
+        if is_dev_mode:
+            # В dev-режиме создаем пользователя с таким ID
+            print(f"Dev mode: User {user_id} not found, creating new user")
+            user = User(
+                telegram_id=user_id,  # Используем user_id как telegram_id для простоты
+                username=f"user_{user_id}",
+                display_name=f"User {user_id}",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return user
         raise credentials_exception
 
     print(f"Using user: id={user.id}, telegram_id={user.telegram_id}, display_name={user.display_name}")
