@@ -1,0 +1,15 @@
+[Unit]
+Description=RepDay Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/repdaybot/backend
+Environment="PATH=/var/www/repdaybot/backend/venv/bin"
+ExecStart=/var/www/repdaybot/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
