@@ -70,15 +70,18 @@ def _validate_init_data(init_data: str) -> dict:
     print(f"Hash received: {hash_received[:16]}...")
     print(f"Data keys: {sorted(data.keys())}")
 
-    # Вычисляем секретный ключ: HMAC-SHA256(bot_token, "WebAppData")
-    secret_key = hmac.new(
-        BOT_TOKEN.encode(), 
-        msg=b"WebAppData", 
-        digestmod=hashlib.sha256
-    ).digest()
+    # По документации Telegram:
+    # secret_key = SHA256(bot_token) - просто SHA256, не HMAC!
+    secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
     
-    # Вычисляем хеш: HMAC-SHA256(secret_key, data_check_string)
-    h = hmac.new(secret_key, msg=data_check_string.encode(), digestmod=hashlib.sha256).hexdigest()
+    # hash = HMAC-SHA256(secret_key, data_check_string)
+    h = hmac.new(
+        key=secret_key,
+        msg=data_check_string.encode(),
+        digestmod=hashlib.sha256
+    ).hexdigest()
+    
+    print(f"Calculated hash: {h[:16]}..., received: {hash_received[:16]}...")
 
     if h != hash_received:
         # Логируем для отладки (без чувствительных данных)
