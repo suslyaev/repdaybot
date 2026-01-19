@@ -201,8 +201,12 @@ export const ChallengePage: React.FC<Props> = ({
             className="primary-button"
             style={{ flex: 2 }}
             onClick={() => {
-              const link = `https://t.me/RepDayBot?startapp=${challenge.invite_code}`;
-              window.Telegram?.WebApp.openTelegramLink?.(link);
+              const deepLink = `https://t.me/repdaybot/repday?startapp=${challenge.invite_code}`;
+              const text = `Присоединяйтесь к нашему челленджу \"${challenge.title}\" в RepDay`;
+              const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(
+                deepLink
+              )}&text=${encodeURIComponent(text)}`;
+              window.Telegram?.WebApp.openTelegramLink?.(shareUrl);
             }}
           >
             Поделиться челленджем

@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, telegram_bot
@@ -328,7 +328,7 @@ def get_stats(
             models.User.display_name,
             func.coalesce(func.sum(models.DailyProgress.value), 0).label("total_value"),
             func.coalesce(
-                func.sum(func.case((models.DailyProgress.completed == True, 1), else_=0)),
+                func.sum(case((models.DailyProgress.completed.is_(True), 1), else_=0)),
                 0,
             ).label("completed_days"),
         )

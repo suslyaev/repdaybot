@@ -10,6 +10,7 @@ interface Props {
 export const ChallengeStatsPage: React.FC<Props> = ({ challengeId, onBack }) => {
   const [stats, setStats] = useState<ChallengeStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -17,6 +18,10 @@ export const ChallengeStatsPage: React.FC<Props> = ({ challengeId, onBack }) => 
       try {
         const data = await api.getStats(challengeId);
         setStats(data);
+        setError(null);
+      } catch (e) {
+        console.error("Stats load error:", e);
+        setError("Не удалось загрузить статистику. Попробуйте позже.");
       } finally {
         setLoading(false);
       }
@@ -24,8 +29,40 @@ export const ChallengeStatsPage: React.FC<Props> = ({ challengeId, onBack }) => 
     void load();
   }, [challengeId]);
 
-  if (loading || !stats) {
+  if (loading) {
     return <div className="screen">Статистика загружается…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="screen">
+        <header className="topbar">
+          <button className="topbar-button" onClick={onBack}>
+            Назад
+          </button>
+          <div className="topbar-title">Статистика</div>
+        </header>
+        <main className="content">
+          <p className="text">{error}</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="screen">
+        <header className="topbar">
+          <button className="topbar-button" onClick={onBack}>
+            Назад
+          </button>
+          <div className="topbar-title">Статистика</div>
+        </header>
+        <main className="content">
+          <p className="text">Пока нет данных для статистики.</p>
+        </main>
+      </div>
+    );
   }
 
   return (
