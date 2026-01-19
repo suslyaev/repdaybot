@@ -30,7 +30,27 @@ export const ChallengeStatsPage: React.FC<Props> = ({ challengeId, onBack }) => 
   }, [challengeId]);
 
   if (loading) {
-    return <div className="screen">Статистика загружается…</div>;
+    return (
+      <div className="screen">
+        <header className="topbar">
+          <button className="topbar-button" onClick={onBack}>
+            Назад
+          </button>
+          <div className="topbar-title">Статистика</div>
+        </header>
+        <main className="content">
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            minHeight: "50vh",
+            padding: "20px"
+          }}>
+            <div style={{ textAlign: "center" }}>Статистика загружается…</div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   if (error) {

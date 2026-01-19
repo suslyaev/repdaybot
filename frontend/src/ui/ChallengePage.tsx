@@ -24,6 +24,8 @@ export const ChallengePage: React.FC<Props> = ({
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customValue, setCustomValue] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -84,7 +86,19 @@ export const ChallengePage: React.FC<Props> = ({
   };
 
   if (loading || !challenge) {
-    return <div className="screen">Загрузка челленджа…</div>;
+    return (
+      <div className="screen">
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          minHeight: "100vh",
+          padding: "20px"
+        }}>
+          <div style={{ textAlign: "center" }}>Загрузка челленджа…</div>
+        </div>
+      </div>
+    );
   }
 
   const todayPercent =
@@ -187,30 +201,78 @@ export const ChallengePage: React.FC<Props> = ({
                   >
                     Выполнил цель
                   </button>
-                  <button
-                    className="ghost-button"
-                    onClick={async () => {
-                      const raw = window.prompt("Сколько сделали сегодня?");
-                      if (!raw) return;
-                      const v = Number(raw);
-                      if (Number.isNaN(v)) return;
-                      setUpdating(true);
-                      try {
-                        await api.updateProgress(challenge.id, {
-                          date: new Date().toISOString().slice(0, 10),
-                          set_value: v,
-                        });
-                        const fresh = await api.getChallengeDetail(challenge.id);
-                        setChallenge(fresh);
-                        onProgressUpdated?.(); // Обновляем список челленджей
-                      } finally {
-                        setUpdating(false);
-                      }
-                    }}
-                    disabled={updating}
-                  >
-                    Свое значение
-                  </button>
+                  {showCustomInput ? (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        value={customValue}
+                        onChange={(e) => setCustomValue(e.target.value)}
+                        placeholder="Введите значение"
+                        autoFocus
+                        style={{
+                          flex: 1,
+                          padding: "8px 10px",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(255, 255, 255, 0.2)",
+                          background: "rgba(10, 12, 18, 0.9)",
+                          color: "inherit",
+                          fontSize: "16px",
+                        }}
+                      />
+                      <button
+                        className="ghost-button"
+                        onClick={async () => {
+                          const v = Number(customValue);
+                          if (Number.isNaN(v) || v < 0) {
+                            alert("Введите корректное число (0 или больше)");
+                            return;
+                          }
+                          setUpdating(true);
+                          try {
+                            await api.updateProgress(challenge.id, {
+                              date: new Date().toISOString().slice(0, 10),
+                              set_value: v,
+                            });
+                            const fresh = await api.getChallengeDetail(challenge.id);
+                            setChallenge(fresh);
+                            onProgressUpdated?.();
+                            setShowCustomInput(false);
+                            setCustomValue("");
+                          } finally {
+                            setUpdating(false);
+                          }
+                        }}
+                        disabled={updating}
+                        style={{ fontSize: "11px", padding: "4px 8px" }}
+                      >
+                        Сохранить
+                      </button>
+                      <button
+                        className="ghost-button"
+                        onClick={() => {
+                          setShowCustomInput(false);
+                          setCustomValue("");
+                        }}
+                        disabled={updating}
+                        style={{ fontSize: "11px", padding: "4px 8px" }}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="ghost-button"
+                      onClick={() => {
+                        setShowCustomInput(true);
+                        setCustomValue(String(me?.today_value || 0));
+                      }}
+                      disabled={updating}
+                    >
+                      Свое значение
+                    </button>
+                  )}
                 </div>
               </div>
             </>

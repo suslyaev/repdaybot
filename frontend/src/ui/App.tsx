@@ -135,8 +135,14 @@ export const App: React.FC = () => {
   if (loading) {
     return (
       <div className="screen">
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Загрузка…
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          minHeight: "100vh",
+          padding: "20px"
+        }}>
+          <div style={{ textAlign: "center" }}>Загрузка…</div>
         </div>
       </div>
     );

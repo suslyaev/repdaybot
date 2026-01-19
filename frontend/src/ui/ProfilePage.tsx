@@ -44,6 +44,13 @@ export const ProfilePage: React.FC<Props> = ({ user, onUserChange, onBack }) => 
         </button>
 
         <div className="section">
+          <div className="section-title">Информация</div>
+          <p className="text small">
+            Telegram ID: {user.telegram_id}
+          </p>
+        </div>
+
+        <div className="section">
           <div className="section-title">Оповещения</div>
           <p className="text">
             Чтобы ребятишки могли пинать вас и присылать напоминания, откройте

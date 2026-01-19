@@ -82,7 +82,15 @@ export const ChallengeHistoryPage: React.FC<Props> = ({
           <div className="topbar-title">История</div>
         </header>
         <main className="content">
-          <div style={{ padding: "20px", textAlign: "center" }}>Загрузка…</div>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            minHeight: "50vh",
+            padding: "20px"
+          }}>
+            <div style={{ textAlign: "center" }}>Загрузка…</div>
+          </div>
         </main>
       </div>
     );
@@ -138,7 +146,7 @@ export const ChallengeHistoryPage: React.FC<Props> = ({
                                 background: "rgba(10, 12, 18, 0.9)",
                                 color: "inherit",
                                 width: "80px",
-                                fontSize: "13px",
+                                fontSize: "16px", /* Предотвращает zoom на iOS */
                               }}
                               autoFocus
                             />
