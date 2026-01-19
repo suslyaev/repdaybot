@@ -19,6 +19,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<ChallengeShort[]>([]);
+  const [challengeRefreshKey, setChallengeRefreshKey] = useState(0);
 
   useEffect(() => {
     // Ждем загрузки Telegram WebApp SDK
@@ -60,7 +61,15 @@ export const App: React.FC = () => {
         setChallenges(chs);
 
         if (res.invite_challenge) {
-          setRoute({ name: "invite", challenge: res.invite_challenge });
+          // Проверяем, является ли пользователь уже участником
+          const isAlreadyParticipant = chs.some((c) => c.id === res.invite_challenge!.id);
+          if (isAlreadyParticipant) {
+            // Если уже участник - просто открываем челлендж
+            setRoute({ name: "challenge", id: res.invite_challenge.id });
+          } else {
+            // Если не участник - показываем экран приглашения
+            setRoute({ name: "invite", challenge: res.invite_challenge });
+          }
         }
           } catch (error) {
             console.error("Init error:", error);
@@ -94,6 +103,17 @@ export const App: React.FC = () => {
   const handleChallengeCreated = (challenge: ChallengeShort) => {
     setChallenges((prev) => [...prev, challenge]);
     setRoute({ name: "challenge", id: challenge.id });
+  };
+
+  const handleChallengeDeleted = async (id: number) => {
+    // Удаляем из списка и перезагружаем список с сервера
+    setChallenges((prev) => prev.filter((ch) => ch.id !== id));
+    try {
+      const fresh = await api.getChallenges();
+      setChallenges(fresh);
+    } catch (e) {
+      console.error("Failed to reload challenges", e);
+    }
   };
 
   const handleRouteBack = () => {
@@ -154,10 +174,12 @@ export const App: React.FC = () => {
   } else if (route.name === "challenge") {
     content = (
       <ChallengePage
+        key={`challenge-${route.id}-${challengeRefreshKey}`}
         challengeId={route.id}
         currentUserId={auth.user.id}
         onBack={handleRouteBack}
         onOpenStats={() => setRoute({ name: "stats", id: route.id })}
+        onChallengeDeleted={handleChallengeDeleted}
       />
     );
   } else if (route.name === "stats") {
@@ -188,11 +210,19 @@ export const App: React.FC = () => {
               <button
                 className="primary-button"
                 onClick={async () => {
-                  const detail = await api.joinChallenge(ch.id);
-                  setChallenges((prev) =>
-                    prev.some((c) => c.id === ch.id) ? prev : [...prev, ch]
-                  );
-                  setRoute({ name: "challenge", id: detail.id });
+                  try {
+                    const detail = await api.joinChallenge(ch.id);
+                    // Обновляем список челленджей
+                    const freshChallenges = await api.getChallenges();
+                    setChallenges(freshChallenges);
+                    // Принудительно обновляем ChallengePage
+                    setChallengeRefreshKey((prev) => prev + 1);
+                    // Переходим на страницу челленджа
+                    setRoute({ name: "challenge", id: detail.id });
+                  } catch (e) {
+                    console.error("Join challenge error", e);
+                    alert("Не удалось присоединиться к челленджу");
+                  }
                 }}
               >
                 Присоединиться

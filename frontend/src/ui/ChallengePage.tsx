@@ -7,6 +7,7 @@ interface Props {
   currentUserId: number;
   onBack: () => void;
   onOpenStats: () => void;
+  onChallengeDeleted?: (id: number) => void;
 }
 
 export const ChallengePage: React.FC<Props> = ({
@@ -14,6 +15,7 @@ export const ChallengePage: React.FC<Props> = ({
   currentUserId,
   onBack,
   onOpenStats,
+  onChallengeDeleted,
 }) => {
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +259,7 @@ export const ChallengePage: React.FC<Props> = ({
                 void api
                   .deleteChallenge(challenge.id)
                   .then(() => {
+                    onChallengeDeleted?.(challenge.id);
                     onBack();
                   })
                   .catch((e) => {
