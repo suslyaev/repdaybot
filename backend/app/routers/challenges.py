@@ -204,6 +204,11 @@ def join_challenge(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.ChallengeDetail:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Join challenge {challenge_id}: current_user.id={current_user.id}, telegram_id={current_user.telegram_id}, display_name={current_user.display_name}")
+    
     ch = db.get(models.Challenge, challenge_id)
     if not ch:
         raise HTTPException(status_code=404, detail="Challenge not found")
@@ -214,6 +219,7 @@ def join_challenge(
         .first()
     )
     if not existing:
+        logger.info(f"Adding user {current_user.id} to challenge {challenge_id}")
         participant = models.ChallengeParticipant(
             challenge_id=challenge_id,
             user_id=current_user.id,
@@ -221,6 +227,9 @@ def join_challenge(
         )
         db.add(participant)
         db.commit()
+        logger.info(f"User {current_user.id} added to challenge {challenge_id}")
+    else:
+        logger.info(f"User {current_user.id} already in challenge {challenge_id}")
 
     return get_challenge(challenge_id, db, current_user)
 
@@ -232,6 +241,11 @@ def update_progress(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> dict:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Update progress: challenge={challenge_id}, user_id={current_user.id}, telegram_id={current_user.telegram_id}, date={payload.date}")
+    
     ch = db.get(models.Challenge, challenge_id)
     if not ch:
         raise HTTPException(status_code=404, detail="Challenge not found")

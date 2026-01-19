@@ -68,17 +68,11 @@ def get_current_user(
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
             user_id = payload.get("sub")
-            print(f"Dev mode: JWT decoded without signature check, user_id={user_id}")
+            print(f"Dev mode: JWT decoded, user_id={user_id}, token_preview={token[:20]}...")
         except Exception as e:
-            print(f"Dev mode: Failed to decode JWT even without signature check: {e}")
-            # Fallback: используем первого пользователя
-            user = db.query(User).first()
-            if not user:
-                user = User(telegram_id=0, username="dev", display_name="Dev User")
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-            return user
+            print(f"ERROR: Dev mode: Failed to decode JWT: {e}")
+            print(f"Token length: {len(token)}, token start: {token[:50] if len(token) > 50 else token}")
+            raise credentials_exception
     else:
         # В проде - строгая валидация
         try:
@@ -88,34 +82,16 @@ def get_current_user(
             raise credentials_exception
 
     if user_id is None:
-        if is_dev_mode:
-            # Fallback в dev-режиме
-            user = db.query(User).first()
-            if not user:
-                user = User(telegram_id=0, username="dev", display_name="Dev User")
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-            return user
+        print(f"ERROR: user_id is None after decoding token")
         raise credentials_exception
 
-    # Используем пользователя из токена
+    # Используем пользователя из токена - ОБЯЗАТЕЛЬНО
     user = db.get(User, user_id)
     if user is None:
-        if is_dev_mode:
-            # В dev-режиме создаем пользователя с таким ID
-            print(f"Dev mode: User {user_id} not found, creating new user")
-            user = User(
-                telegram_id=user_id,  # Используем user_id как telegram_id для простоты
-                username=f"user_{user_id}",
-                display_name=f"User {user_id}",
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            return user
+        print(f"ERROR: User with id={user_id} from token not found in database")
+        print(f"Available users: {[u.id for u in db.query(User).all()]}")
         raise credentials_exception
 
-    print(f"Using user: id={user.id}, telegram_id={user.telegram_id}, display_name={user.display_name}")
+    print(f"✓ Using user: id={user.id}, telegram_id={user.telegram_id}, display_name={user.display_name}")
     return user
 

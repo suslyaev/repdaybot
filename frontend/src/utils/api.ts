@@ -11,7 +11,11 @@ const BASE_URL = import.meta.env.PROD ? "/api" : "http://localhost:8000";
 let authState: AuthState | null = null;
 
 function authHeader() {
-  if (!authState) return {};
+  if (!authState) {
+    console.warn("API: No auth state, request will fail");
+    return {};
+  }
+  console.log("API: Using token:", authState.token.substring(0, 20) + "...", "user_id:", authState.user.id);
   return {
     Authorization: `Bearer ${authState.token}`,
   };
@@ -50,6 +54,11 @@ async function request<T>(
 export const api = {
   setAuth(a: AuthState | null) {
     authState = a;
+    if (a) {
+      console.log("API: Auth set, user_id:", a.user.id, "token:", a.token.substring(0, 20) + "...");
+    } else {
+      console.log("API: Auth cleared");
+    }
   },
   async authTelegram(initData: string) {
     if (!initData || initData.trim() === "") {
