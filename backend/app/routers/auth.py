@@ -28,15 +28,32 @@ def _get_db() -> Session:
 def _validate_init_data(init_data: str) -> dict:
     """
     Валидация initData по алгоритму Telegram WebApp.
-    Если TELEGRAM_BOT_TOKEN не задан, считаем dev-режимом и не валидируем подпись.
+    Если TELEGRAM_BOT_TOKEN не задан или SKIP_INIT_DATA_VALIDATION=true,
+    пропускаем проверку подписи (только парсим данные).
     """
     if not init_data:
         raise HTTPException(status_code=400, detail="init_data is required")
 
-    # dev-режим: просто парсим query-string
-    if not BOT_TOKEN:
-        print("WARNING: BOT_TOKEN not set, skipping validation (dev mode)")
-        return dict(parse_qsl(init_data, keep_blank_values=True))
+    # Проверяем, нужно ли пропустить валидацию
+    skip_validation = (
+        not BOT_TOKEN or 
+        os.getenv("SKIP_INIT_DATA_VALIDATION", "").lower() == "true"
+    )
+    
+    if skip_validation:
+        print("WARNING: Skipping init_data signature validation")
+        data = dict(parse_qsl(init_data, keep_blank_values=True))
+        # Базовая проверка auth_date (опционально)
+        auth_date_str = data.get("auth_date")
+        if auth_date_str:
+            try:
+                auth_date = int(auth_date_str)
+                now = int(time.time())
+                if now - auth_date > 86400 * 7:  # Не старше недели
+                    print(f"WARNING: init_data is very old (auth_date: {auth_date}, now: {now})")
+            except (ValueError, TypeError):
+                pass
+        return data
 
     # Извлекаем hash из оригинальной строки
     hash_match = re.search(r'hash=([^&]+)', init_data)
