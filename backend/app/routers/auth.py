@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import hashlib
 import hmac
 import os
+import time
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, HTTPException
@@ -33,29 +34,69 @@ def _validate_init_data(init_data: str) -> dict:
 
     # dev-режим: просто парсим query-string
     if not BOT_TOKEN:
+        print("WARNING: BOT_TOKEN not set, skipping validation (dev mode)")
         return dict(parse_qsl(init_data, keep_blank_values=True))
 
     data = dict(parse_qsl(init_data, keep_blank_values=True))
     hash_received = data.pop("hash", None)
     if not hash_received:
-        raise HTTPException(status_code=400, detail="hash missing")
+        raise HTTPException(status_code=400, detail="hash missing in init_data")
 
+    # Формируем строку для проверки (сортируем по ключу, включаем все значения)
     data_check_arr = [f"{k}={v}" for k, v in sorted(data.items())]
     data_check_string = "\n".join(data_check_arr)
 
-    secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
+    # Вычисляем секретный ключ: HMAC-SHA256(bot_token, "WebAppData")
+    secret_key = hmac.new(
+        BOT_TOKEN.encode(), 
+        msg=b"WebAppData", 
+        digestmod=hashlib.sha256
+    ).digest()
+    
+    # Вычисляем хеш: HMAC-SHA256(secret_key, data_check_string)
     h = hmac.new(secret_key, msg=data_check_string.encode(), digestmod=hashlib.sha256).hexdigest()
 
     if h != hash_received:
-        raise HTTPException(status_code=401, detail="invalid init_data")
+        # Логируем для отладки (без чувствительных данных)
+        print(f"Validation failed: expected {h[:8]}..., got {hash_received[:8]}...")
+        print(f"Data check string length: {len(data_check_string)}")
+        print(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
+        raise HTTPException(
+            status_code=401, 
+            detail="invalid init_data signature. Check TELEGRAM_BOT_TOKEN in .env"
+        )
+
+    # Проверяем auth_date (данные не должны быть старше 24 часов)
+    auth_date_str = data.get("auth_date")
+    if auth_date_str:
+        try:
+            auth_date = int(auth_date_str)
+            now = int(time.time())
+            if now - auth_date > 86400:  # 24 часа
+                raise HTTPException(
+                    status_code=401,
+                    detail="init_data expired (auth_date too old)"
+                )
+        except (ValueError, TypeError):
+            pass  # Если не удалось распарсить, пропускаем проверку
 
     return data
 
 
 @router.post("/telegram", response_model=schemas.AuthResponse)
 def auth_telegram(payload: schemas.AuthRequest) -> schemas.AuthResponse:
+    import logging
+    logger = logging.getLogger(__name__)
+    
     init_data = payload.init_data
-    data = _validate_init_data(init_data)
+    logger.info(f"Auth request received, init_data length: {len(init_data) if init_data else 0}")
+    logger.info(f"BOT_TOKEN configured: {bool(BOT_TOKEN)}")
+    
+    try:
+        data = _validate_init_data(init_data)
+    except HTTPException as e:
+        logger.error(f"Validation failed: {e.detail}")
+        raise
 
     # user и start_param лежат в JSON-строке внутри полей
     import json
