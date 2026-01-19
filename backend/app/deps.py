@@ -56,34 +56,25 @@ def get_current_user(
     is_dev_mode = not os.getenv("TELEGRAM_BOT_TOKEN")
 
     # Пробуем декодировать JWT
+    user_id: int | None = None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int | None = payload.get("sub")
-        if user_id is None:
-            if is_dev_mode:
-                # В dev-режиме используем первого пользователя
-                user = db.query(User).first()
-                if not user:
-                    user = User(telegram_id=0, username="dev", display_name="Dev User")
-                    db.add(user)
-                    db.commit()
-                    db.refresh(user)
-                return user
-            raise credentials_exception
+        user_id = payload.get("sub")
     except JWTError:
         # В dev-режиме: если токен невалидный, пробуем декодировать без проверки подписи
         if is_dev_mode:
             try:
                 payload_unsafe = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
-                user_id_unsafe = payload_unsafe.get("sub")
-                if user_id_unsafe:
-                    user = db.get(User, user_id_unsafe)
-                    if user:
-                        return user
+                user_id = payload_unsafe.get("sub")
             except Exception:
                 pass
-            
-            # Если не получилось - используем первого пользователя
+        else:
+            # В проде - строгая валидация
+            raise credentials_exception
+
+    if user_id is None:
+        if is_dev_mode:
+            # В dev-режиме если не удалось получить user_id - используем первого пользователя
             user = db.query(User).first()
             if not user:
                 user = User(telegram_id=0, username="dev", display_name="Dev User")
@@ -91,17 +82,21 @@ def get_current_user(
                 db.commit()
                 db.refresh(user)
             return user
-        # В проде - строгая валидация
         raise credentials_exception
 
+    # Используем пользователя из токена
     user = db.get(User, user_id)
     if user is None:
-        # В dev-режиме создаём пользователя, если его нет
+        # Пользователя с таким ID нет - это ошибка (токен ссылается на несуществующего пользователя)
+        # В dev-режиме можем попробовать найти пользователя по telegram_id или создать нового
         if is_dev_mode:
-            user = User(telegram_id=0, username="dev", display_name="Dev User")
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            # Пробуем найти любого пользователя или создать нового
+            user = db.query(User).first()
+            if not user:
+                user = User(telegram_id=0, username="dev", display_name="Dev User")
+                db.add(user)
+                db.commit()
+                db.refresh(user)
             return user
         raise credentials_exception
 
