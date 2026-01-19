@@ -52,6 +52,9 @@ export const api = {
     authState = a;
   },
   async authTelegram(initData: string) {
+    if (!initData || initData.trim() === "") {
+      throw new Error("initData пустой. Откройте приложение через Telegram бота.");
+    }
     return request<{ token: string; user: UserMe; invite_challenge?: ChallengeShort }>(
       "/auth/telegram",
       {

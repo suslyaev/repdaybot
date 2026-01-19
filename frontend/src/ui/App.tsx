@@ -21,17 +21,32 @@ export const App: React.FC = () => {
   const [challenges, setChallenges] = useState<ChallengeShort[]>([]);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
-
-    const init = async () => {
-      try {
-        const initData = tg?.initData ?? "";
-        console.log("Telegram WebApp initialized", { hasInitData: !!initData });
+    // Ждем загрузки Telegram WebApp SDK
+    const waitForTelegram = () => {
+      if (window.Telegram?.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
         
-        const res = await api.authTelegram(initData);
-        console.log("Auth response:", res);
+        // Устанавливаем тему
+        tg.setHeaderColor("#0f1115");
+        tg.setBackgroundColor("#0f1115");
+
+        const init = async () => {
+          try {
+            const initData = tg.initData || "";
+            console.log("Telegram WebApp initialized", { 
+              hasInitData: !!initData,
+              initDataLength: initData.length,
+              hasUser: !!tg.initDataUnsafe?.user
+            });
+            
+            if (!initData) {
+              throw new Error("initData не получен. Откройте приложение через Telegram бота.");
+            }
+            
+            const res = await api.authTelegram(initData);
+            console.log("Auth response:", res);
         
         const authData: AuthState = {
           token: res.token,
@@ -47,16 +62,33 @@ export const App: React.FC = () => {
         if (res.invite_challenge) {
           setRoute({ name: "invite", challenge: res.invite_challenge });
         }
-      } catch (error) {
-        console.error("Init error:", error);
-        setError(error instanceof Error ? error.message : "Ошибка загрузки");
-        setLoading(false);
-      } finally {
-        setLoading(false);
+          } catch (error) {
+            console.error("Init error:", error);
+            setError(error instanceof Error ? error.message : "Ошибка загрузки");
+            setLoading(false);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        void init();
+      } else {
+        // Если SDK не загрузился за 2 секунды, пробуем без него (dev режим)
+        setTimeout(() => {
+          if (!window.Telegram?.WebApp) {
+            console.warn("Telegram WebApp SDK не загружен. Работаем в dev режиме.");
+            setError("Откройте приложение через Telegram бота для корректной работы.");
+            setLoading(false);
+          }
+        }, 2000);
       }
     };
 
-    void init();
+    // Проверяем сразу и через небольшую задержку
+    waitForTelegram();
+    const timeout = setTimeout(waitForTelegram, 100);
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   const handleChallengeCreated = (challenge: ChallengeShort) => {
