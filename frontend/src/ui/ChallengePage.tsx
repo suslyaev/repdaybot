@@ -151,6 +151,13 @@ export const ChallengePage: React.FC<Props> = ({
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button
                     className="secondary-button"
+                    onClick={() => void handleDelta(5)}
+                    disabled={updating}
+                  >
+                    +5
+                  </button>
+                  <button
+                    className="secondary-button"
                     onClick={() => void handleDelta(10)}
                     disabled={updating}
                   >
@@ -158,17 +165,18 @@ export const ChallengePage: React.FC<Props> = ({
                   </button>
                   <button
                     className="secondary-button"
-                    onClick={() => void handleDelta(20)}
+                    onClick={() => void handleDelta(25)}
                     disabled={updating}
                   >
-                    +20
+                    +25
                   </button>
                   <button
                     className="secondary-button"
-                    onClick={() => void handleDelta(50)}
+                    onClick={() => void handleDelta(-5)}
                     disabled={updating}
+                    style={{ color: "#ff6b6b" }}
                   >
-                    +50
+                    -5
                   </button>
                   <button
                     className="secondary-button"
@@ -180,19 +188,11 @@ export const ChallengePage: React.FC<Props> = ({
                   </button>
                   <button
                     className="secondary-button"
-                    onClick={() => void handleDelta(-20)}
+                    onClick={() => void handleDelta(-25)}
                     disabled={updating}
                     style={{ color: "#ff6b6b" }}
                   >
-                    -20
-                  </button>
-                  <button
-                    className="secondary-button"
-                    onClick={() => void handleDelta(-50)}
-                    disabled={updating}
-                    style={{ color: "#ff6b6b" }}
-                  >
-                    -50
+                    -25
                   </button>
                   <button
                     className="ghost-button"
