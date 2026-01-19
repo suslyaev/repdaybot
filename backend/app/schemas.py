@@ -66,6 +66,9 @@ class ChallengeDetail(BaseModel):
     is_public: bool
     invite_code: str
 
+    # Флаг, что текущий пользователь - владелец (owner)
+    is_owner: bool
+
     class Participant(BaseModel):
         id: int
         display_name: str

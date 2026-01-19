@@ -48,6 +48,7 @@ export interface ChallengeDetail {
   is_public: boolean;
   invite_code: string;
   participants: ChallengeParticipant[];
+  is_owner: boolean;
 }
 
 export interface ChallengeStats {

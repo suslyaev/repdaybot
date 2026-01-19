@@ -206,13 +206,14 @@ export const ChallengePage: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
-                <button
-                  className="ghost-button"
-                  onClick={() => void api.sendNudge(challenge.id, p.id)}
-                  disabled={p.id === currentUserId}
-                >
-                  Пнуть
-                </button>
+                {p.id !== currentUserId && (
+                  <button
+                    className="ghost-button"
+                    onClick={() => void api.sendNudge(challenge.id, p.id)}
+                  >
+                    Пнуть
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -243,6 +244,31 @@ export const ChallengePage: React.FC<Props> = ({
             Поделиться челленджем
           </button>
         </div>
+        {challenge.is_owner && (
+          <button
+            className="ghost-button"
+            style={{ marginTop: 8, width: "100%" }}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Удалить челлендж? Это действие нельзя отменить."
+                )
+              ) {
+                void api
+                  .deleteChallenge(challenge.id)
+                  .then(() => {
+                    onBack();
+                  })
+                  .catch((e) => {
+                    console.error("Delete challenge error", e);
+                    alert("Не удалось удалить челлендж");
+                  });
+              }
+            }}
+          >
+            Удалить челлендж
+          </button>
+        )}
       </footer>
     </div>
   );

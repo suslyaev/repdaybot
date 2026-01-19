@@ -151,6 +151,12 @@ def get_challenge(
         .all()
     )
 
+    # Определяем, является ли текущий пользователь владельцем
+    me_participation = next(
+        (p for p in participants if p.user_id == current_user.id), None
+    )
+    is_owner = bool(me_participation and me_participation.role == "owner")
+
     result_participants: list[schemas.ChallengeDetail.Participant] = []
 
     for p in participants:
@@ -188,6 +194,7 @@ def get_challenge(
         is_public=ch.is_public,
         invite_code=ch.invite_code,
         participants=result_participants,
+        is_owner=is_owner,
     )
 
 
@@ -423,6 +430,35 @@ def send_nudge(
         from_user_id=current_user.id,
         challenge_id=challenge_id,
     )
+
+    return {"ok": True}
+
+
+@router.delete("/{challenge_id}")
+def delete_challenge(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> dict:
+    ch = db.get(models.Challenge, challenge_id)
+    if not ch:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+
+    # Проверяем, что текущий пользователь - владелец
+    participation = (
+        db.query(models.ChallengeParticipant)
+        .filter_by(challenge_id=challenge_id, user_id=current_user.id)
+        .first()
+    )
+    if not participation or participation.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owner can delete challenge")
+
+    # Удаляем связанные записи
+    db.query(models.Nudge).filter_by(challenge_id=challenge_id).delete()
+    db.query(models.DailyProgress).filter_by(challenge_id=challenge_id).delete()
+    db.query(models.ChallengeParticipant).filter_by(challenge_id=challenge_id).delete()
+    db.delete(ch)
+    db.commit()
 
     return {"ok": True}
 

@@ -51,7 +51,6 @@ export const ChallengesListPage: React.FC<Props> = ({
         today_progress_percent: 0,
         days_completed: 0,
       };
-      onChallengesChange([...challenges, short]);
       onChallengeCreated(short);
     })();
   };

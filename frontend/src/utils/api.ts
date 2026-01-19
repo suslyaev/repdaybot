@@ -113,5 +113,10 @@ export const api = {
       method: "POST",
     });
   },
+  async deleteChallenge(id: number): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/challenges/${id}`, {
+      method: "DELETE",
+    });
+  },
 };
 
