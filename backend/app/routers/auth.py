@@ -47,21 +47,23 @@ def _validate_init_data(init_data: str) -> dict:
     # Парсим данные для использования в коде
     data = dict(parse_qsl(init_data, keep_blank_values=True))
     
-    # Формируем строку для проверки из оригинальной строки
-    # Извлекаем все параметры кроме hash и signature, сохраняя их в оригинальном URL-encoded виде
+    # Формируем строку для проверки
+    # По документации Telegram: нужно декодировать значения, затем отсортировать и собрать строку
     pairs = []
     for part in init_data.split('&'):
         if '=' in part:
             key, value = part.split('=', 1)
-            # Используем ключ и значение как есть (URL-encoded)
             if key not in ('hash', 'signature'):
-                pairs.append((key, value))
+                # Декодируем значение из URL-encoding
+                decoded_value = unquote(value)
+                pairs.append((key, decoded_value))
     
     # Сортируем по ключу и формируем строку для проверки
     pairs.sort(key=lambda x: x[0])
     data_check_string = '\n'.join(f"{k}={v}" for k, v in pairs)
     
     print(f"Pairs count: {len(pairs)}, keys: {[k for k, _ in pairs]}")
+    print(f"User value preview: {pairs[2][1][:50] if len(pairs) > 2 else 'N/A'}...")
     
     # Логируем для отладки
     print(f"Data check string preview: {data_check_string[:200]}...")
