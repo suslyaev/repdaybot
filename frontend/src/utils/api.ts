@@ -116,9 +116,9 @@ export const api = {
   async getStats(id: number): Promise<ChallengeStats> {
     return request<ChallengeStats>(`/challenges/${id}/stats`);
   },
-  async sendNudge(id: number, to_user_id: number): Promise<{ ok: boolean }> {
+  async sendNudge(id: number, to_user_id: number): Promise<{ ok: boolean; nudged_at?: string; next_nudge_available_at?: string }> {
     const params = new URLSearchParams({ to_user_id: String(to_user_id) });
-    return request<{ ok: boolean }>(`/challenges/${id}/nudge?${params.toString()}`, {
+    return request<{ ok: boolean; nudged_at?: string; next_nudge_available_at?: string }>(`/challenges/${id}/nudge?${params.toString()}`, {
       method: "POST",
     });
   },

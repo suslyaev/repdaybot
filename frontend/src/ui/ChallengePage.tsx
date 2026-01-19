@@ -26,6 +26,8 @@ export const ChallengePage: React.FC<Props> = ({
   const [updating, setUpdating] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState("");
+  // Храним время последнего nudge для каждого пользователя: { userId: timestamp }
+  const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -323,26 +325,65 @@ export const ChallengePage: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
-                {p.id !== currentUserId && (
-                  <button
-                    className="ghost-button"
-                    onClick={async () => {
-                      try {
-                        await api.sendNudge(challenge.id, p.id);
-                        // Можно показать уведомление, но для MVP просто тихо
-                      } catch (e) {
-                        const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
-                        if (errorMsg.includes("429")) {
-                          alert("Слишком часто! Можно пнуть не чаще раза в час.");
-                        } else {
-                          alert(`Ошибка: ${errorMsg}`);
+                {p.id !== currentUserId && (() => {
+                  const lastNudgeTime = nudgeTimestamps[p.id];
+                  const oneHourInMs = 60 * 60 * 1000;
+                  const canNudge = !lastNudgeTime || (Date.now() - lastNudgeTime) >= oneHourInMs;
+                  const minutesUntilNext = lastNudgeTime 
+                    ? Math.ceil((oneHourInMs - (Date.now() - lastNudgeTime)) / 60000)
+                    : 0;
+
+                  return (
+                    <button
+                      className="ghost-button"
+                      onClick={async () => {
+                        if (!canNudge) {
+                          window.Telegram?.WebApp.showAlert?.(
+                            `Можно пнуть не чаще раза в час. Попробуйте через ${minutesUntilNext} мин.`
+                          );
+                          return;
                         }
-                      }
-                    }}
-                  >
-                    Пнуть
-                  </button>
-                )}
+
+                        try {
+                          const result = await api.sendNudge(challenge.id, p.id);
+                          // Сохраняем время последнего nudge
+                          setNudgeTimestamps((prev) => ({
+                            ...prev,
+                            [p.id]: Date.now(),
+                          }));
+                          
+                          // Показываем уведомление через Telegram WebApp
+                          window.Telegram?.WebApp.showAlert?.(
+                            `Вы пнули ${p.display_name}! 💪`,
+                            () => {
+                              // Callback после закрытия уведомления (опционально)
+                            }
+                          );
+                        } catch (e) {
+                          const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
+                          if (errorMsg.includes("429")) {
+                            const match = errorMsg.match(/(\d+)\s+minutes/);
+                            const minutes = match ? match[1] : "60";
+                            window.Telegram?.WebApp.showAlert?.(
+                              `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
+                            );
+                          } else {
+                            window.Telegram?.WebApp.showAlert?.(`Ошибка: ${errorMsg}`) || 
+                            alert(`Ошибка: ${errorMsg}`);
+                          }
+                        }
+                      }}
+                      disabled={!canNudge || updating}
+                      style={{
+                        opacity: canNudge ? 1 : 0.5,
+                        cursor: canNudge ? "pointer" : "not-allowed",
+                      }}
+                      title={!canNudge ? `Можно пнуть через ${minutesUntilNext} мин.` : undefined}
+                    >
+                      {canNudge ? "Пнуть" : `Через ${minutesUntilNext}м`}
+                    </button>
+                  );
+                })()}
               </div>
             ))}
           </div>

@@ -437,7 +437,12 @@ def send_nudge(
         .first()
     )
     if recent:
-        raise HTTPException(status_code=429, detail="too many nudges")
+        # Возвращаем время последнего nudge для отображения на фронте
+        time_until_next = (recent.created_at + td(hours=1) - datetime.utcnow()).total_seconds()
+        raise HTTPException(
+            status_code=429, 
+            detail=f"too many nudges. Next nudge available in {int(time_until_next / 60)} minutes"
+        )
 
     nudge = models.Nudge(
         from_user_id=current_user.id,
@@ -460,7 +465,11 @@ def send_nudge(
         logger.error(f"Failed to send Telegram message: {e}")
         # Не падаем, если сообщение не отправилось - nudge уже сохранён
 
-    return {"ok": True}
+    return {
+        "ok": True,
+        "nudged_at": datetime.utcnow().isoformat(),
+        "next_nudge_available_at": (datetime.utcnow() + td(hours=1)).isoformat(),
+    }
 
 
 @router.delete("/{challenge_id}")
