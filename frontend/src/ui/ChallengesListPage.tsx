@@ -72,33 +72,49 @@ export const ChallengesListPage: React.FC<Props> = ({
           </div>
         ) : (
           <div className="list">
-            {challenges.map((ch) => (
-              <button
-                key={ch.id}
-                className="card"
-                onClick={() => onOpenChallenge(ch.id)}
-              >
-                <div className="card-title">{ch.title}</div>
-                <div className="card-sub">
-                  {ch.goal_type === "quantitative"
-                    ? `Цель: ${ch.daily_goal ?? 0} ${ch.unit} в день`
-                    : ch.goal_type === "checkin"
-                    ? "Ежедневный чек-ин"
-                    : `Таймер: ${ch.daily_goal ?? 0} ${ch.unit} в день`}
-                </div>
-                <div className="card-progress">
-                  <span>
-                    Сегодня: {ch.today_progress_value ?? 0}{" "}
-                    {ch.daily_goal ? `/ ${ch.daily_goal}` : ""}
-                  </span>
-                  {ch.days_completed != null && (
-                    <span className="days">
-                      Дней выполнено: {ch.days_completed ?? 0}
+            {challenges.map((ch) => {
+              const value = ch.today_progress_value ?? 0;
+              const goal = ch.daily_goal ?? 0;
+              const percent =
+                goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : null;
+
+              return (
+                <button
+                  key={ch.id}
+                  className="card"
+                  onClick={() => onOpenChallenge(ch.id)}
+                >
+                  <div className="card-title">{ch.title}</div>
+                  <div className="card-sub">
+                    {ch.goal_type === "quantitative"
+                      ? `Цель: ${goal} ${ch.unit} в день`
+                      : ch.goal_type === "checkin"
+                      ? "Ежедневный чек-ин"
+                      : `Таймер: ${goal} ${ch.unit} в день`}
+                  </div>
+                  <div className="card-progress">
+                    <span>
+                      Сегодня: {value}
+                      {goal ? ` / ${goal}` : ""}
+                      {percent !== null ? ` (${percent}%)` : ""}
                     </span>
+                    {ch.days_completed != null && (
+                      <span className="days">
+                        Дней выполнено: {ch.days_completed ?? 0}
+                      </span>
+                    )}
+                  </div>
+                  {percent !== null && (
+                    <div className="progress">
+                      <div
+                        className="progress-inner"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
                   )}
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </main>

@@ -98,6 +98,16 @@ export const ChallengePage: React.FC<Props> = ({
                   Цель: {challenge.daily_goal} {challenge.unit} в день
                 </p>
               )}
+              {challenge.daily_goal && me && (
+                <p className="text small">
+                  Сейчас: {me.today_value} / {challenge.daily_goal} (
+                  {Math.min(
+                    100,
+                    Math.round((me.today_value / challenge.daily_goal) * 100)
+                  )}
+                  %)
+                </p>
+              )}
               <div className="list">
                 <div className="row">
                   <div className="row-text">
@@ -133,6 +143,27 @@ export const ChallengePage: React.FC<Props> = ({
                     disabled={updating}
                   >
                     Выполнил цель
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      const raw = window.prompt("Сколько сделали сегодня?");
+                      if (!raw) return;
+                      const v = Number(raw);
+                      if (Number.isNaN(v)) return;
+                      void api
+                        .updateProgress(challenge.id, {
+                          date: new Date().toISOString().slice(0, 10),
+                          set_value: v,
+                        })
+                        .then(async () => {
+                          const fresh = await api.getChallengeDetail(challenge.id);
+                          setChallenge(fresh);
+                        });
+                    }}
+                    disabled={updating}
+                  >
+                    Свое значение
                   </button>
                 </div>
               </div>

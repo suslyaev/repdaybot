@@ -35,7 +35,7 @@ def get_current_user(
         detail="Could not validate credentials",
     )
 
-    # Dev-режим: нет TELEGRAM_BOT_TOKEN -> допускаем отсутствие Authorization
+    # Dev-режим: если нет Authorization и нет TELEGRAM_BOT_TOKEN — создаём/используем dev user
     if authorization is None or not authorization.startswith("Bearer "):
         if not os.getenv("TELEGRAM_BOT_TOKEN"):
             user = db.query(User).first()
@@ -53,33 +53,8 @@ def get_current_user(
         raise credentials_exception
 
     token = authorization.removeprefix("Bearer ").strip()
-    
-    # Dev-режим: если токен невалидный, используем dev user
-    if not os.getenv("TELEGRAM_BOT_TOKEN"):
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id: int | None = payload.get("sub")
-            if user_id:
-                user = db.get(User, user_id)
-                if user:
-                    return user
-        except (JWTError, Exception):
-            pass  # Игнорируем ошибки JWT в dev-режиме
-        
-        # Используем dev user
-        user = db.query(User).first()
-        if not user:
-            user = User(
-                telegram_id=0,
-                username="dev",
-                display_name="Dev User",
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        return user
-    
-    # Prod-режим: строгая валидация JWT
+
+    # Всегда пробуем декодировать JWT (и в dev, и в prod)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int | None = payload.get("sub")
