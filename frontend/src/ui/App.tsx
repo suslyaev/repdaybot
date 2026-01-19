@@ -3,6 +3,7 @@ import { ChallengesListPage } from "./ChallengesListPage";
 import { ProfilePage } from "./ProfilePage";
 import { ChallengePage } from "./ChallengePage";
 import { ChallengeStatsPage } from "./ChallengeStatsPage";
+import { ChallengeHistoryPage } from "./ChallengeHistoryPage";
 import { api } from "../utils/api";
 import type { AuthState, ChallengeShort, UserMe } from "../utils/types";
 
@@ -11,6 +12,7 @@ type Route =
   | { name: "profile" }
   | { name: "challenge"; id: number }
   | { name: "stats"; id: number }
+  | { name: "history"; id: number }
   | { name: "invite"; challenge: ChallengeShort };
 
 export const App: React.FC = () => {
@@ -120,6 +122,16 @@ export const App: React.FC = () => {
     setRoute({ name: "challenges" });
   };
 
+  const handleProgressUpdated = async () => {
+    // Обновляем список челленджей после изменения прогресса
+    try {
+      const fresh = await api.getChallenges();
+      setChallenges(fresh);
+    } catch (e) {
+      console.error("Failed to reload challenges after progress update", e);
+    }
+  };
+
   if (loading) {
     return (
       <div className="screen">
@@ -179,7 +191,9 @@ export const App: React.FC = () => {
         currentUserId={auth.user.id}
         onBack={handleRouteBack}
         onOpenStats={() => setRoute({ name: "stats", id: route.id })}
+        onOpenHistory={() => setRoute({ name: "history", id: route.id })}
         onChallengeDeleted={handleChallengeDeleted}
+        onProgressUpdated={handleProgressUpdated}
       />
     );
   } else if (route.name === "stats") {
@@ -187,6 +201,14 @@ export const App: React.FC = () => {
       <ChallengeStatsPage
         challengeId={route.id}
         onBack={() => setRoute({ name: "challenge", id: route.id })}
+      />
+    );
+  } else if (route.name === "history") {
+    content = (
+      <ChallengeHistoryPage
+        challengeId={route.id}
+        onBack={() => setRoute({ name: "challenge", id: route.id })}
+        onProgressUpdated={handleProgressUpdated}
       />
     );
   } else {

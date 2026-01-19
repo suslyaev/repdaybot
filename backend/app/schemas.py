@@ -27,6 +27,7 @@ class UserUpdate(BaseModel):
 class ChallengeShort(BaseModel):
     id: int
     title: str
+    description: Optional[str] = None
     goal_type: str
     unit: str
     daily_goal: Optional[int]
@@ -99,6 +100,7 @@ class ChallengeStats(BaseModel):
     class DayPoint(BaseModel):
         date: date
         percent: float
+        value: int = 0  # Реальное значение для дня
 
     points: list[DayPoint]
 

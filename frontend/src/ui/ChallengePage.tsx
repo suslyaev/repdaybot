@@ -7,7 +7,9 @@ interface Props {
   currentUserId: number;
   onBack: () => void;
   onOpenStats: () => void;
+  onOpenHistory?: () => void;
   onChallengeDeleted?: (id: number) => void;
+  onProgressUpdated?: () => void;
 }
 
 export const ChallengePage: React.FC<Props> = ({
@@ -15,7 +17,9 @@ export const ChallengePage: React.FC<Props> = ({
   currentUserId,
   onBack,
   onOpenStats,
+  onOpenHistory,
   onChallengeDeleted,
+  onProgressUpdated,
 }) => {
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,7 @@ export const ChallengePage: React.FC<Props> = ({
       await api.updateProgress(challenge.id, { date: today, delta });
       const fresh = await api.getChallengeDetail(challenge.id);
       setChallenge(fresh);
+      onProgressUpdated?.(); // Обновляем список челленджей
     } finally {
       setUpdating(false);
     }
@@ -72,6 +77,7 @@ export const ChallengePage: React.FC<Props> = ({
       }
       const fresh = await api.getChallengeDetail(challenge.id);
       setChallenge(fresh);
+      onProgressUpdated?.(); // Обновляем список челленджей
     } finally {
       setUpdating(false);
     }
@@ -117,7 +123,7 @@ export const ChallengePage: React.FC<Props> = ({
                     <div className="row-sub">Нажимайте по мере выполнения</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button
                     className="secondary-button"
                     onClick={() => void handleDelta(10)}
@@ -140,6 +146,30 @@ export const ChallengePage: React.FC<Props> = ({
                     +50
                   </button>
                   <button
+                    className="secondary-button"
+                    onClick={() => void handleDelta(-10)}
+                    disabled={updating}
+                    style={{ color: "#ff6b6b" }}
+                  >
+                    -10
+                  </button>
+                  <button
+                    className="secondary-button"
+                    onClick={() => void handleDelta(-20)}
+                    disabled={updating}
+                    style={{ color: "#ff6b6b" }}
+                  >
+                    -20
+                  </button>
+                  <button
+                    className="secondary-button"
+                    onClick={() => void handleDelta(-50)}
+                    disabled={updating}
+                    style={{ color: "#ff6b6b" }}
+                  >
+                    -50
+                  </button>
+                  <button
                     className="ghost-button"
                     onClick={() => void handleComplete()}
                     disabled={updating}
@@ -148,20 +178,23 @@ export const ChallengePage: React.FC<Props> = ({
                   </button>
                   <button
                     className="ghost-button"
-                    onClick={() => {
+                    onClick={async () => {
                       const raw = window.prompt("Сколько сделали сегодня?");
                       if (!raw) return;
                       const v = Number(raw);
                       if (Number.isNaN(v)) return;
-                      void api
-                        .updateProgress(challenge.id, {
+                      setUpdating(true);
+                      try {
+                        await api.updateProgress(challenge.id, {
                           date: new Date().toISOString().slice(0, 10),
                           set_value: v,
-                        })
-                        .then(async () => {
-                          const fresh = await api.getChallengeDetail(challenge.id);
-                          setChallenge(fresh);
                         });
+                        const fresh = await api.getChallengeDetail(challenge.id);
+                        setChallenge(fresh);
+                        onProgressUpdated?.(); // Обновляем список челленджей
+                      } finally {
+                        setUpdating(false);
+                      }
                     }}
                     disabled={updating}
                   >
@@ -235,7 +268,7 @@ export const ChallengePage: React.FC<Props> = ({
       </main>
 
       <footer className="bottombar">
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             className="secondary-button"
             style={{ flex: 1 }}
@@ -243,9 +276,18 @@ export const ChallengePage: React.FC<Props> = ({
           >
             Статистика
           </button>
+          {onOpenHistory && (
+            <button
+              className="secondary-button"
+              style={{ flex: 1 }}
+              onClick={onOpenHistory}
+            >
+              История
+            </button>
+          )}
           <button
             className="primary-button"
-            style={{ flex: 2 }}
+            style={{ flex: onOpenHistory ? 1 : 2 }}
             onClick={() => {
               const deepLink = `https://t.me/repdaybot/repday?startapp=${challenge.invite_code}`;
               const text = `Присоединяйтесь к нашему челленджу \"${challenge.title}\" в RepDay`;
@@ -255,7 +297,7 @@ export const ChallengePage: React.FC<Props> = ({
               window.Telegram?.WebApp.openTelegramLink?.(shareUrl);
             }}
           >
-            Поделиться челленджем
+            Поделиться
           </button>
         </div>
         {challenge.is_owner && (

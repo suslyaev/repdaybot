@@ -96,10 +96,11 @@ body {
 .card {
   text-align: left;
   border-radius: 18px;
-  padding: 12px 14px;
+  padding: 12px 14px 16px;
   border: none;
   background: radial-gradient(circle at top left, #20263a, #141620);
   color: inherit;
+  margin-bottom: 8px;
 }
 
 .card-title {

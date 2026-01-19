@@ -59,6 +59,7 @@ def list_my_challenges(
             schemas.ChallengeShort(
                 id=ch.id,
                 title=ch.title,
+                description=ch.description,
                 goal_type=ch.goal_type,
                 unit=ch.unit,
                 daily_goal=ch.daily_goal,
@@ -325,8 +326,10 @@ def get_stats(
                 percent = min(100.0, dp.value / ch.daily_goal * 100.0)
             else:
                 percent = 100.0 if dp.completed else 0.0
+            day_value = dp.value
         else:
             percent = 0.0
+            day_value = 0
 
         if dp and dp.completed:
             completed_days += 1
@@ -337,6 +340,7 @@ def get_stats(
             schemas.ChallengeStats.DayPoint(
                 date=day,
                 percent=percent,
+                value=day_value,
             )
         )
 

@@ -16,6 +16,7 @@ export interface AuthState {
 export interface ChallengeShort {
   id: number;
   title: string;
+  description?: string | null;
   goal_type: string;
   unit: string;
   daily_goal?: number | null;
@@ -54,7 +55,7 @@ export interface ChallengeDetail {
 export interface ChallengeStats {
   completed_days: number;
   missed_days: number;
-  points: { date: string; percent: number }[];
+  points: { date: string; percent: number; value: number }[];
   leaderboard_by_value: LeaderboardItem[];
   leaderboard_by_days: LeaderboardItem[];
 }
