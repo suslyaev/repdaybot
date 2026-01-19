@@ -17,6 +17,7 @@ export const App: React.FC = () => {
   const [route, setRoute] = useState<Route>({ name: "challenges" });
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<ChallengeShort[]>([]);
 
   useEffect(() => {
@@ -27,7 +28,11 @@ export const App: React.FC = () => {
     const init = async () => {
       try {
         const initData = tg?.initData ?? "";
+        console.log("Telegram WebApp initialized", { hasInitData: !!initData });
+        
         const res = await api.authTelegram(initData);
+        console.log("Auth response:", res);
+        
         const authData: AuthState = {
           token: res.token,
           user: res.user,
@@ -36,11 +41,16 @@ export const App: React.FC = () => {
         setAuth(authData);
 
         const chs = await api.getChallenges();
+        console.log("Challenges loaded:", chs.length);
         setChallenges(chs);
 
         if (res.invite_challenge) {
           setRoute({ name: "invite", challenge: res.invite_challenge });
         }
+      } catch (error) {
+        console.error("Init error:", error);
+        setError(error instanceof Error ? error.message : "Ошибка загрузки");
+        setLoading(false);
       } finally {
         setLoading(false);
       }
@@ -58,8 +68,45 @@ export const App: React.FC = () => {
     setRoute({ name: "challenges" });
   };
 
-  if (loading || !auth) {
-    return <div className="screen">Загрузка…</div>;
+  if (loading) {
+    return (
+      <div className="screen">
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Загрузка…
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="screen">
+        <div style={{ padding: "20px", textAlign: "center", color: "#ff6b6b" }}>
+          <div style={{ marginBottom: "10px", fontWeight: "bold" }}>Ошибка</div>
+          <div style={{ fontSize: "14px", marginBottom: "20px" }}>{error}</div>
+          <button
+            className="primary-button"
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              window.location.reload();
+            }}
+          >
+            Перезагрузить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auth) {
+    return (
+      <div className="screen">
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Ошибка авторизации
+        </div>
+      </div>
+    );
   }
 
   let content: React.ReactNode = null;
