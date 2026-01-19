@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import os
 import time
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, unquote
 
 from fastapi import APIRouter, HTTPException
 from jose import jwt
@@ -43,8 +43,14 @@ def _validate_init_data(init_data: str) -> dict:
         raise HTTPException(status_code=400, detail="hash missing in init_data")
 
     # Формируем строку для проверки (сортируем по ключу, включаем все значения)
+    # Важно: значения должны быть в том же виде, как пришли (URL-encoded или декодированные)
+    # По документации Telegram, нужно использовать оригинальные значения из query string
     data_check_arr = [f"{k}={v}" for k, v in sorted(data.items())]
     data_check_string = "\n".join(data_check_arr)
+    
+    # Логируем для отладки (первые 100 символов)
+    print(f"Data check string preview: {data_check_string[:100]}...")
+    print(f"Hash received: {hash_received[:16]}...")
 
     # Вычисляем секретный ключ: HMAC-SHA256(bot_token, "WebAppData")
     secret_key = hmac.new(
@@ -58,12 +64,24 @@ def _validate_init_data(init_data: str) -> dict:
 
     if h != hash_received:
         # Логируем для отладки (без чувствительных данных)
-        print(f"Validation failed: expected {h[:8]}..., got {hash_received[:8]}...")
+        print(f"Validation failed: expected {h[:16]}..., got {hash_received[:16]}...")
         print(f"Data check string length: {len(data_check_string)}")
         print(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
+        print(f"BOT_TOKEN length: {len(BOT_TOKEN) if BOT_TOKEN else 0}")
+        print(f"BOT_TOKEN starts with: {BOT_TOKEN[:10] if BOT_TOKEN else 'N/A'}...")
+        print(f"Data keys: {list(data.keys())}")
+        
+        # Проверяем, может быть токен неправильный - пробуем получить информацию о боте
+        try:
+            import requests
+            bot_info = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=2).json()
+            print(f"Bot info check: {bot_info.get('ok', False)}, username: {bot_info.get('result', {}).get('username', 'N/A')}")
+        except Exception as e:
+            print(f"Bot info check failed: {e}")
+        
         raise HTTPException(
             status_code=401, 
-            detail="invalid init_data signature. Check TELEGRAM_BOT_TOKEN in .env"
+            detail="invalid init_data signature. Check TELEGRAM_BOT_TOKEN matches the bot used for Mini App"
         )
 
     # Проверяем auth_date (данные не должны быть старше 24 часов)
