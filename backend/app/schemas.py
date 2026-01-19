@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     display_name: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserMe(UserBase):
@@ -39,7 +39,7 @@ class ChallengeShort(BaseModel):
     days_completed: int | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ChallengeCreate(BaseModel):
@@ -79,7 +79,7 @@ class ChallengeDetail(BaseModel):
     participants: list[Participant]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ProgressUpdate(BaseModel):
