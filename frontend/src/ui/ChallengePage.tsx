@@ -87,6 +87,15 @@ export const ChallengePage: React.FC<Props> = ({
     return <div className="screen">Загрузка челленджа…</div>;
   }
 
+  const todayPercent =
+    challenge.goal_type === "quantitative" || challenge.goal_type === "time"
+      ? challenge.daily_goal && me
+        ? Math.min(100, Math.round((me.today_value / challenge.daily_goal) * 100))
+        : 0
+      : me?.today_completed
+      ? 100
+      : 0;
+
   return (
     <div className="screen">
       <header className="topbar">
@@ -109,13 +118,15 @@ export const ChallengePage: React.FC<Props> = ({
               {challenge.daily_goal && me && (
                 <p className="text small">
                   Сейчас: {me.today_value} / {challenge.daily_goal} (
-                  {Math.min(
-                    100,
-                    Math.round((me.today_value / challenge.daily_goal) * 100)
-                  )}
-                  %)
+                  {todayPercent}%)
                 </p>
               )}
+              <div className="progress" style={{ marginBottom: 12 }}>
+                <div
+                  className="progress-inner"
+                  style={{ width: `${todayPercent}%` }}
+                />
+              </div>
               <div className="list">
                 <div className="row">
                   <div className="row-text">
@@ -205,6 +216,15 @@ export const ChallengePage: React.FC<Props> = ({
             </>
           ) : (
             <div className="list">
+              <p className="text small">
+                {me?.today_completed ? "Сегодня уже отмечено ✔" : "Сегодня ещё не отмечали"}
+              </p>
+              <div className="progress" style={{ marginBottom: 12 }}>
+                <div
+                  className="progress-inner"
+                  style={{ width: `${todayPercent}%` }}
+                />
+              </div>
               <button
                 className="primary-button"
                 onClick={() => void handleComplete()}
