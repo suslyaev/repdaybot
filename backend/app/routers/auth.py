@@ -42,15 +42,19 @@ def _validate_init_data(init_data: str) -> dict:
     if not hash_received:
         raise HTTPException(status_code=400, detail="hash missing in init_data")
 
+    # Исключаем signature из проверки (это отдельное поле, не участвует в валидации)
+    data.pop("signature", None)
+
     # Формируем строку для проверки (сортируем по ключу, включаем все значения)
     # Важно: значения должны быть в том же виде, как пришли (URL-encoded или декодированные)
     # По документации Telegram, нужно использовать оригинальные значения из query string
     data_check_arr = [f"{k}={v}" for k, v in sorted(data.items())]
     data_check_string = "\n".join(data_check_arr)
     
-    # Логируем для отладки (первые 100 символов)
-    print(f"Data check string preview: {data_check_string[:100]}...")
+    # Логируем для отладки (первые 200 символов)
+    print(f"Data check string preview: {data_check_string[:200]}...")
     print(f"Hash received: {hash_received[:16]}...")
+    print(f"Data keys after removing hash and signature: {list(data.keys())}")
 
     # Вычисляем секретный ключ: HMAC-SHA256(bot_token, "WebAppData")
     secret_key = hmac.new(
