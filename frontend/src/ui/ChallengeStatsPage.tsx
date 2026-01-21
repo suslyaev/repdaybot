@@ -102,20 +102,6 @@ export const ChallengeStatsPage: React.FC<Props> = ({ challengeId, onBack }) => 
         </section>
 
         <section className="section">
-          <div className="section-title">Динамика</div>
-          <div className="list">
-            {stats.points.map((p) => (
-              <div key={p.date} className="row">
-                <div className="row-text">
-                  <div className="row-title">{p.date}</div>
-                  <div className="row-sub">{Math.round(p.percent)}%</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="section">
           <div className="section-title">Лидерборд по объёму</div>
           <div className="list">
             {stats.leaderboard_by_value.map((i) => (
