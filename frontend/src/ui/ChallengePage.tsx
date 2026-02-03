@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChallengeDetail, ChallengeMessage, ChallengeParticipant } from "../utils/types";
 import { api } from "../utils/api";
 
@@ -33,6 +33,7 @@ export const ChallengePage: React.FC<Props> = ({
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [sendMessageLoading, setSendMessageLoading] = useState(false);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   // Тик раз в минуту, чтобы обновлять отображаемый кулдаун и разблокировать кнопку по истечении часа
   const [tick, setTick] = useState(0);
@@ -183,7 +184,12 @@ export const ChallengePage: React.FC<Props> = ({
         <div className="topbar-title">{challenge.title}</div>
       </header>
 
-      <main className="content">
+      <main
+        className="content"
+        style={{
+          paddingBottom: chatOpen ? 200 : undefined,
+        }}
+      >
         <section className="section">
           <div className="section-title">Мой прогресс сегодня</div>
           {challenge.goal_type === "quantitative" || challenge.goal_type === "time" ? (
@@ -493,11 +499,17 @@ export const ChallengePage: React.FC<Props> = ({
               {/* Поле ввода и кнопка — выше списка сообщений */}
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 12 }}>
                 <input
+                  ref={chatInputRef}
                   type="text"
                   placeholder="Сообщение…"
                   maxLength={2000}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      chatInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 100);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
