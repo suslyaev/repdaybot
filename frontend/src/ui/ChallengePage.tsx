@@ -441,13 +441,9 @@ export const ChallengePage: React.FC<Props> = ({
                                 `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
                               );
                             } else if (errorMsg.includes("recent_progress_update")) {
-                              window.Telegram?.WebApp.showAlert?.(
-                                "Себя пни и выполняй челлендж"
-                              ) || alert("Себя пни и выполняй челлендж");
+                              window.Telegram?.WebApp.showAlert?.("Себя пни и выполняй челлендж");
                             } else if (errorMsg.includes("already_completed_today")) {
-                              window.Telegram?.WebApp.showAlert?.(
-                                "Он уже выполнил цель сегодня"
-                              ) || alert("Он уже выполнил цель сегодня");
+                              window.Telegram?.WebApp.showAlert?.("Он уже выполнил цель сегодня");
                             } else {
                               window.Telegram?.WebApp.showAlert?.(`Ошибка: ${errorMsg}`) || alert(`Ошибка: ${errorMsg}`);
                             }
