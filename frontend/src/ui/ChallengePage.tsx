@@ -397,20 +397,29 @@ export const ChallengePage: React.FC<Props> = ({
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {p.id !== currentUserId && (() => {
                     const _ = tick;
+                    const alreadyCompletedToday = p.today_completed;
                     const lastNudgeTime = getLastNudgeTime(p);
                     const oneHourInMs = 60 * 60 * 1000;
                     const now = Date.now();
                     const timeSinceNudge = lastNudgeTime ? now - lastNudgeTime : Infinity;
-                    const canNudge = !lastNudgeTime || timeSinceNudge >= oneHourInMs;
+                    const cooldownPassed = !lastNudgeTime || timeSinceNudge >= oneHourInMs;
+                    const canNudge = !alreadyCompletedToday && cooldownPassed;
                     const minutesUntilNext = lastNudgeTime && timeSinceNudge < oneHourInMs
                       ? Math.max(1, Math.ceil((oneHourInMs - timeSinceNudge) / 60000))
                       : 0;
+
+                    const buttonText = alreadyCompletedToday
+                      ? "Завтра"
+                      : cooldownPassed
+                        ? "Пнуть"
+                        : `Через ${minutesUntilNext}м`;
 
                     return (
                       <button
                         className="ghost-button"
                         onClick={async () => {
-                          if (!canNudge) {
+                          if (alreadyCompletedToday) return;
+                          if (!cooldownPassed) {
                             window.Telegram?.WebApp.showAlert?.(
                               `Можно пнуть не чаще раза в час. Попробуйте через ${minutesUntilNext} мин.`
                             );
@@ -424,13 +433,21 @@ export const ChallengePage: React.FC<Props> = ({
                             updateNudgeTimestamps(fresh);
                             window.Telegram?.WebApp.showAlert?.(`Вы пнули ${p.display_name}! 💪`);
                           } catch (e) {
-                            const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
+                            const errorMsg = e instanceof Error ? e.message : "";
                             if (errorMsg.includes("429")) {
                               const match = errorMsg.match(/(\d+)\s+minutes/);
                               const minutes = match ? match[1] : "60";
                               window.Telegram?.WebApp.showAlert?.(
                                 `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
                               );
+                            } else if (errorMsg.includes("recent_progress_update")) {
+                              window.Telegram?.WebApp.showAlert?.(
+                                "Себя пни и выполняй челлендж"
+                              ) || alert("Себя пни и выполняй челлендж");
+                            } else if (errorMsg.includes("already_completed_today")) {
+                              window.Telegram?.WebApp.showAlert?.(
+                                "Он уже выполнил цель сегодня"
+                              ) || alert("Он уже выполнил цель сегодня");
                             } else {
                               window.Telegram?.WebApp.showAlert?.(`Ошибка: ${errorMsg}`) || alert(`Ошибка: ${errorMsg}`);
                             }
@@ -441,9 +458,15 @@ export const ChallengePage: React.FC<Props> = ({
                           opacity: canNudge ? 1 : 0.5,
                           cursor: canNudge ? "pointer" : "not-allowed",
                         }}
-                        title={!canNudge ? `Можно пнуть через ${minutesUntilNext} мин.` : undefined}
+                        title={
+                          alreadyCompletedToday
+                            ? "Уже выполнил сегодня"
+                            : !cooldownPassed
+                              ? `Можно пнуть через ${minutesUntilNext} мин.`
+                              : undefined
+                        }
                       >
-                        {canNudge ? "Пнуть" : `Через ${minutesUntilNext}м`}
+                        {buttonText}
                       </button>
                     );
                   })()}

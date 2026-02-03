@@ -84,6 +84,9 @@ class DailyProgress(Base):
     date: Mapped[date] = mapped_column(Date)
     value: Mapped[int] = mapped_column(Integer, default=0)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True
+    )
 
     challenge: Mapped[Challenge] = relationship(back_populates="daily_progress")
     user: Mapped[User] = relationship()

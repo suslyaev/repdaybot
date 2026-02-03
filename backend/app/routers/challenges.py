@@ -446,9 +446,44 @@ def send_nudge(
     if not receiver:
         raise HTTPException(status_code=404, detail="target not participant")
 
-    # простой rate-limit: не чаще раза в час по паре from/to/challenge
     from datetime import datetime, timedelta as td
 
+    today = date.today()
+
+    # Нельзя пнуть того, кто уже выполнил цель сегодня
+    target_today = (
+        db.query(models.DailyProgress)
+        .filter_by(
+            challenge_id=challenge_id,
+            user_id=to_user_id,
+            date=today,
+        )
+        .first()
+    )
+    if target_today and target_today.completed:
+        raise HTTPException(
+            status_code=400,
+            detail="already_completed_today",
+        )
+
+    # Нельзя пнуть того, кто менял прогресс в течение последнего часа
+    last_progress = (
+        db.query(models.DailyProgress)
+        .filter_by(challenge_id=challenge_id, user_id=to_user_id)
+        .filter(models.DailyProgress.updated_at.is_not(None))
+        .order_by(models.DailyProgress.updated_at.desc())
+        .first()
+    )
+    if last_progress and last_progress.updated_at:
+        one_hour_ago = datetime.utcnow() - td(hours=1)
+        utc_updated = last_progress.updated_at.replace(tzinfo=None) if last_progress.updated_at.tzinfo else last_progress.updated_at
+        if utc_updated >= one_hour_ago:
+            raise HTTPException(
+                status_code=400,
+                detail="recent_progress_update",
+            )
+
+    # Простой rate-limit: не чаще раза в час по паре from/to/challenge
     one_hour_ago = datetime.utcnow() - td(hours=1)
     recent = (
         db.query(models.Nudge)
