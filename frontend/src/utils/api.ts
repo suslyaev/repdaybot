@@ -127,5 +127,10 @@ export const api = {
       method: "DELETE",
     });
   },
+  async removeParticipant(challengeId: number, userId: number): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/challenges/${challengeId}/participants/${userId}`, {
+      method: "DELETE",
+    });
+  },
 };
 

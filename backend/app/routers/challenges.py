@@ -495,6 +495,45 @@ def send_nudge(
     }
 
 
+@router.delete("/{challenge_id}/participants/{user_id}")
+def remove_participant(
+    challenge_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> dict:
+    """Исключить участника из челленджа. Только владелец. Нельзя исключить себя."""
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot remove yourself")
+    ch = db.get(models.Challenge, challenge_id)
+    if not ch:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+    owner = (
+        db.query(models.ChallengeParticipant)
+        .filter_by(challenge_id=challenge_id, user_id=current_user.id)
+        .first()
+    )
+    if not owner or owner.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owner can remove participants")
+    target = (
+        db.query(models.ChallengeParticipant)
+        .filter_by(challenge_id=challenge_id, user_id=user_id)
+        .first()
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    db.query(models.Nudge).filter(
+        models.Nudge.challenge_id == challenge_id,
+        (models.Nudge.from_user_id == user_id) | (models.Nudge.to_user_id == user_id),
+    ).delete(synchronize_session=False)
+    db.query(models.DailyProgress).filter_by(
+        challenge_id=challenge_id, user_id=user_id
+    ).delete()
+    db.delete(target)
+    db.commit()
+    return {"ok": True}
+
+
 @router.delete("/{challenge_id}")
 def delete_challenge(
     challenge_id: int,

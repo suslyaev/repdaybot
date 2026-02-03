@@ -356,7 +356,7 @@ export const ChallengePage: React.FC<Props> = ({
           </p>
         </section>
 
-        <section className="section">
+        <section className="section" style={{ paddingBottom: 24 }}>
           <div className="section-title">Команда</div>
           <div className="list">
             {challenge.participants.map((p) => (
@@ -373,76 +373,86 @@ export const ChallengePage: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
-                {p.id !== currentUserId && (() => {
-                  const _ = tick;
-                  // Используем те же данные, что и при проверке пинка: из списка участников (API)
-                  const lastNudgeTime = getLastNudgeTime(p);
-                  const oneHourInMs = 60 * 60 * 1000;
-                  const now = Date.now();
-                  const timeSinceNudge = lastNudgeTime ? now - lastNudgeTime : Infinity;
-                  const canNudge = !lastNudgeTime || timeSinceNudge >= oneHourInMs;
-                  const minutesUntilNext = lastNudgeTime && timeSinceNudge < oneHourInMs
-                    ? Math.max(1, Math.ceil((oneHourInMs - timeSinceNudge) / 60000))
-                    : 0;
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {p.id !== currentUserId && (() => {
+                    const _ = tick;
+                    const lastNudgeTime = getLastNudgeTime(p);
+                    const oneHourInMs = 60 * 60 * 1000;
+                    const now = Date.now();
+                    const timeSinceNudge = lastNudgeTime ? now - lastNudgeTime : Infinity;
+                    const canNudge = !lastNudgeTime || timeSinceNudge >= oneHourInMs;
+                    const minutesUntilNext = lastNudgeTime && timeSinceNudge < oneHourInMs
+                      ? Math.max(1, Math.ceil((oneHourInMs - timeSinceNudge) / 60000))
+                      : 0;
 
-                  return (
+                    return (
+                      <button
+                        className="ghost-button"
+                        onClick={async () => {
+                          if (!canNudge) {
+                            window.Telegram?.WebApp.showAlert?.(
+                              `Можно пнуть не чаще раза в час. Попробуйте через ${minutesUntilNext} мин.`
+                            );
+                            return;
+                          }
+                          try {
+                            await api.sendNudge(challenge.id, p.id);
+                            setNudgeTimestamps((prev) => ({ ...prev, [p.id]: Date.now() }));
+                            const fresh = await api.getChallengeDetail(challenge.id);
+                            setChallenge(fresh);
+                            updateNudgeTimestamps(fresh);
+                            window.Telegram?.WebApp.showAlert?.(`Вы пнули ${p.display_name}! 💪`);
+                          } catch (e) {
+                            const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
+                            if (errorMsg.includes("429")) {
+                              const match = errorMsg.match(/(\d+)\s+minutes/);
+                              const minutes = match ? match[1] : "60";
+                              window.Telegram?.WebApp.showAlert?.(
+                                `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
+                              );
+                            } else {
+                              window.Telegram?.WebApp.showAlert?.(`Ошибка: ${errorMsg}`) || alert(`Ошибка: ${errorMsg}`);
+                            }
+                          }
+                        }}
+                        disabled={!canNudge || updating}
+                        style={{
+                          opacity: canNudge ? 1 : 0.5,
+                          cursor: canNudge ? "pointer" : "not-allowed",
+                        }}
+                        title={!canNudge ? `Можно пнуть через ${minutesUntilNext} мин.` : undefined}
+                      >
+                        {canNudge ? "Пнуть" : `Через ${minutesUntilNext}м`}
+                      </button>
+                    );
+                  })()}
+                  {challenge.is_owner && p.id !== currentUserId && (
                     <button
+                      type="button"
                       className="ghost-button"
+                      style={{ color: "var(--danger, #e53935)", fontSize: "12px" }}
+                      disabled={updating}
                       onClick={async () => {
-                        if (!canNudge) {
-                          window.Telegram?.WebApp.showAlert?.(
-                            `Можно пнуть не чаще раза в час. Попробуйте через ${minutesUntilNext} мин.`
-                          );
-                          return;
-                        }
-
+                        if (!window.confirm(`Исключить ${p.display_name} из челленджа?`)) return;
+                        setUpdating(true);
                         try {
-                          const result = await api.sendNudge(challenge.id, p.id);
-                          // Сразу сохраняем время пинка локально, чтобы кнопка заблокировалась мгновенно
-                          const now = Date.now();
-                          setNudgeTimestamps((prev) => ({
-                            ...prev,
-                            [p.id]: now,
-                          }));
-                          
-                          // Обновляем челлендж, чтобы получить актуальные данные включая last_nudge_at
+                          await api.removeParticipant(challenge.id, p.id);
                           const fresh = await api.getChallengeDetail(challenge.id);
                           setChallenge(fresh);
-                          // Синхронизируем с данными из API (на случай если время на сервере отличается)
                           updateNudgeTimestamps(fresh);
-                          
-                          // Показываем уведомление через Telegram WebApp
-                          window.Telegram?.WebApp.showAlert?.(
-                            `Вы пнули ${p.display_name}! 💪`,
-                            () => {
-                              // Callback после закрытия уведомления (опционально)
-                            }
-                          );
+                          onProgressUpdated?.();
                         } catch (e) {
-                          const errorMsg = e instanceof Error ? e.message : "Не удалось отправить";
-                          if (errorMsg.includes("429")) {
-                            const match = errorMsg.match(/(\d+)\s+minutes/);
-                            const minutes = match ? match[1] : "60";
-                            window.Telegram?.WebApp.showAlert?.(
-                              `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
-                            );
-                          } else {
-                            window.Telegram?.WebApp.showAlert?.(`Ошибка: ${errorMsg}`) || 
-                            alert(`Ошибка: ${errorMsg}`);
-                          }
+                          window.Telegram?.WebApp.showAlert?.(`Ошибка: ${e instanceof Error ? e.message : "Не удалось исключить"}`) ||
+                            alert("Не удалось исключить");
+                        } finally {
+                          setUpdating(false);
                         }
                       }}
-                      disabled={!canNudge || updating}
-                      style={{
-                        opacity: canNudge ? 1 : 0.5,
-                        cursor: canNudge ? "pointer" : "not-allowed",
-                      }}
-                      title={!canNudge ? `Можно пнуть через ${minutesUntilNext} мин.` : undefined}
                     >
-                      {canNudge ? "Пнуть" : `Через ${minutesUntilNext}м`}
+                      Исключить
                     </button>
-                  );
-                })()}
+                  )}
+                </div>
               </div>
             ))}
           </div>
