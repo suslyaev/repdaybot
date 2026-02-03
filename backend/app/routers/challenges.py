@@ -196,7 +196,7 @@ def _get_challenge_impl(
     me_participation = next(
         (p for p in participants if p.user_id == current_user.id), None
     )
-    is_participant = me_participant is not None
+    is_participant = me_participation is not None
     if not is_participant and not is_superadmin(current_user):
         raise HTTPException(status_code=403, detail="Not a participant")
 
