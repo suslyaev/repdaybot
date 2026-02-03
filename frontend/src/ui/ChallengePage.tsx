@@ -36,21 +36,51 @@ export const ChallengePage: React.FC<Props> = ({
   }, []);
 
   // Функция для обновления nudgeTimestamps из данных челленджа
-  const updateNudgeTimestamps = (challengeData: ChallengeDetail) => {
-    const timestamps: Record<number, number> = {};
-    for (const p of challengeData.participants) {
-      if (p.id !== currentUserId && p.last_nudge_at != null && p.last_nudge_at !== "") {
-        try {
-          const timestamp = new Date(p.last_nudge_at).getTime();
-          if (!isNaN(timestamp) && timestamp > 0) {
-            timestamps[p.id] = timestamp;
+  // Сохраняет существующие локальные значения, если они новее или если в API ответе нет данных
+  const updateNudgeTimestamps = (challengeData: ChallengeDetail, merge: boolean = true) => {
+    if (merge) {
+      // Merge режим: сохраняем локальные значения, если они новее
+      setNudgeTimestamps((prev) => {
+        const updated = { ...prev };
+        for (const p of challengeData.participants) {
+          if (p.id !== currentUserId) {
+            if (p.last_nudge_at != null && p.last_nudge_at !== "") {
+              try {
+                const apiTimestamp = new Date(p.last_nudge_at).getTime();
+                if (!isNaN(apiTimestamp) && apiTimestamp > 0) {
+                  // Используем значение из API только если его нет локально или оно новее
+                  const localTimestamp = prev[p.id];
+                  if (!localTimestamp || apiTimestamp > localTimestamp) {
+                    updated[p.id] = apiTimestamp;
+                  }
+                }
+              } catch (e) {
+                // Игнорируем ошибки парсинга даты
+              }
+            }
+            // Если в API ответе нет last_nudge_at, сохраняем локальное значение (если есть)
+            // Это важно, чтобы не потерять локально сохраненное время после пинка
           }
-        } catch (e) {
-          // Игнорируем ошибки парсинга даты
+        }
+        return updated;
+      });
+    } else {
+      // Режим полной замены: используется только при первой загрузке
+      const timestamps: Record<number, number> = {};
+      for (const p of challengeData.participants) {
+        if (p.id !== currentUserId && p.last_nudge_at != null && p.last_nudge_at !== "") {
+          try {
+            const timestamp = new Date(p.last_nudge_at).getTime();
+            if (!isNaN(timestamp) && timestamp > 0) {
+              timestamps[p.id] = timestamp;
+            }
+          } catch (e) {
+            // Игнорируем ошибки парсинга даты
+          }
         }
       }
+      setNudgeTimestamps(timestamps);
     }
-    setNudgeTimestamps(timestamps);
   };
 
   useEffect(() => {
@@ -60,7 +90,8 @@ export const ChallengePage: React.FC<Props> = ({
         const data = await api.getChallengeDetail(challengeId);
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
-        updateNudgeTimestamps(data);
+        // Используем режим полной замены при первой загрузке
+        updateNudgeTimestamps(data, false);
       } finally {
         setLoading(false);
       }
