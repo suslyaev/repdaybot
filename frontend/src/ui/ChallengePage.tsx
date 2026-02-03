@@ -35,6 +35,24 @@ export const ChallengePage: React.FC<Props> = ({
     return () => clearInterval(id);
   }, []);
 
+  // Функция для обновления nudgeTimestamps из данных челленджа
+  const updateNudgeTimestamps = (challengeData: ChallengeDetail) => {
+    const timestamps: Record<number, number> = {};
+    for (const p of challengeData.participants) {
+      if (p.id !== currentUserId && p.last_nudge_at != null && p.last_nudge_at !== "") {
+        try {
+          const timestamp = new Date(p.last_nudge_at).getTime();
+          if (!isNaN(timestamp) && timestamp > 0) {
+            timestamps[p.id] = timestamp;
+          }
+        } catch (e) {
+          // Игнорируем ошибки парсинга даты
+        }
+      }
+    }
+    setNudgeTimestamps(timestamps);
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -42,13 +60,7 @@ export const ChallengePage: React.FC<Props> = ({
         const data = await api.getChallengeDetail(challengeId);
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
-        const timestamps: Record<number, number> = {};
-        for (const p of data.participants) {
-          if (p.id !== currentUserId && p.last_nudge_at) {
-            timestamps[p.id] = new Date(p.last_nudge_at).getTime();
-          }
-        }
-        setNudgeTimestamps(timestamps);
+        updateNudgeTimestamps(data);
       } finally {
         setLoading(false);
       }
@@ -69,6 +81,7 @@ export const ChallengePage: React.FC<Props> = ({
       await api.updateProgress(challenge.id, { date: today, delta });
       const fresh = await api.getChallengeDetail(challenge.id);
       setChallenge(fresh);
+      updateNudgeTimestamps(fresh); // Обновляем кулдаун пинков
       onProgressUpdated?.(); // Обновляем список челленджей
     } finally {
       setUpdating(false);
@@ -95,6 +108,7 @@ export const ChallengePage: React.FC<Props> = ({
       }
       const fresh = await api.getChallengeDetail(challenge.id);
       setChallenge(fresh);
+      updateNudgeTimestamps(fresh); // Обновляем кулдаун пинков
       onProgressUpdated?.(); // Обновляем список челленджей
     } finally {
       setUpdating(false);
@@ -253,6 +267,7 @@ export const ChallengePage: React.FC<Props> = ({
                             });
                             const fresh = await api.getChallengeDetail(challenge.id);
                             setChallenge(fresh);
+                            updateNudgeTimestamps(fresh); // Обновляем кулдаун пинков
                             onProgressUpdated?.();
                             setShowCustomInput(false);
                             setCustomValue("");
@@ -340,6 +355,8 @@ export const ChallengePage: React.FC<Props> = ({
                   </div>
                 </div>
                 {p.id !== currentUserId && (() => {
+                  // Используем tick для пересчёта кулдауна при каждом обновлении (каждую минуту)
+                  const _ = tick;
                   const lastNudgeTime = nudgeTimestamps[p.id];
                   const oneHourInMs = 60 * 60 * 1000;
                   const canNudge = !lastNudgeTime || (Date.now() - lastNudgeTime) >= oneHourInMs;
@@ -360,11 +377,10 @@ export const ChallengePage: React.FC<Props> = ({
 
                         try {
                           const result = await api.sendNudge(challenge.id, p.id);
-                          // Сохраняем время последнего nudge
-                          setNudgeTimestamps((prev) => ({
-                            ...prev,
-                            [p.id]: Date.now(),
-                          }));
+                          // Обновляем челлендж, чтобы получить актуальные данные включая last_nudge_at
+                          const fresh = await api.getChallengeDetail(challenge.id);
+                          setChallenge(fresh);
+                          updateNudgeTimestamps(fresh); // Обновляем кулдаун пинков из ответа API
                           
                           // Показываем уведомление через Telegram WebApp
                           window.Telegram?.WebApp.showAlert?.(

@@ -187,6 +187,9 @@ def get_challenge(
             )
             if last_nudge:
                 last_nudge_at = last_nudge.created_at
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Found last_nudge for user {p.user_id}: {last_nudge_at}")
 
         result_participants.append(
             schemas.ChallengeDetail.Participant(
