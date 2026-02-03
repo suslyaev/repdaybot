@@ -56,9 +56,16 @@ export const ChallengePage: React.FC<Props> = ({
   // Эффективное время последнего пинка: из API (participant.last_nudge_at) или локальное (после только что пинка)
   const getLastNudgeTime = (p: ChallengeParticipant): number | undefined => {
     const local = nudgeTimestamps[p.id];
-    const fromApi = p.last_nudge_at ? new Date(p.last_nudge_at).getTime() : undefined;
-    if (local && fromApi !== undefined) return Math.max(local, fromApi);
-    return local ?? (fromApi !== undefined && !isNaN(fromApi) && fromApi > 0 ? fromApi : undefined);
+    // Берём из API: поддержка и snake_case и camelCase на случай разной сериализации
+    const lastNudgeAtRaw = p.last_nudge_at ?? (p as Record<string, unknown>).lastNudgeAt;
+    const fromApi =
+      lastNudgeAtRaw != null && lastNudgeAtRaw !== ""
+        ? new Date(String(lastNudgeAtRaw)).getTime()
+        : undefined;
+    const fromApiValid =
+      fromApi !== undefined && !Number.isNaN(fromApi) && fromApi > 0 ? fromApi : undefined;
+    if (local && fromApiValid !== undefined) return Math.max(local, fromApiValid);
+    return local ?? fromApiValid;
   };
 
   useEffect(() => {
@@ -66,6 +73,16 @@ export const ChallengePage: React.FC<Props> = ({
       setLoading(true);
       try {
         const data = await api.getChallengeDetail(challengeId);
+        // Отладка: что пришло с API по last_nudge_at
+        console.log(
+          "Challenge detail loaded, participants:",
+          data.participants.map((q) => ({
+            id: q.id,
+            name: q.display_name,
+            last_nudge_at: q.last_nudge_at,
+            has_key: "last_nudge_at" in (q as Record<string, unknown>),
+          }))
+        );
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
         updateNudgeTimestamps(data);

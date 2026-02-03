@@ -187,6 +187,12 @@ def get_challenge(
             )
             if last_nudge:
                 last_nudge_at = last_nudge.created_at.isoformat()
+                logger = __import__("logging").getLogger(__name__)
+                logger.info(
+                    "get_challenge: last_nudge for to_user_id=%s: %s",
+                    p.user_id,
+                    last_nudge_at,
+                )
 
         result_participants.append(
             schemas.ChallengeDetail.Participant(
