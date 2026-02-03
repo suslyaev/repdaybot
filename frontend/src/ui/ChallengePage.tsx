@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { ChallengeDetail } from "../utils/types";
+import type { ChallengeDetail, ChallengeParticipant } from "../utils/types";
 import { api } from "../utils/api";
 
 interface Props {
@@ -37,48 +37,28 @@ export const ChallengePage: React.FC<Props> = ({
     return () => clearInterval(id);
   }, []);
 
-  // Функция для обновления nudgeTimestamps из данных челленджа
-  // Использует данные из API, но сохраняет локальные значения если они новее (для мгновенной блокировки после пинка)
+  // Локальные метки времени пинка только для мгновенной блокировки после нажатия (до перезапроса)
   const updateNudgeTimestamps = (challengeData: ChallengeDetail) => {
     setNudgeTimestamps((prev) => {
       const updated = { ...prev };
       for (const p of challengeData.participants) {
-        if (p.id !== currentUserId) {
-          if (p.last_nudge_at != null && p.last_nudge_at !== "") {
-            try {
-              const apiTimestamp = new Date(p.last_nudge_at).getTime();
-              if (!isNaN(apiTimestamp) && apiTimestamp > 0) {
-                // Используем значение из API, но сохраняем локальное если оно новее (для мгновенной блокировки)
-                const localTimestamp = prev[p.id];
-                if (!localTimestamp || apiTimestamp >= localTimestamp) {
-                  updated[p.id] = apiTimestamp;
-                }
-                // Если localTimestamp новее, оставляем его (это может быть если только что пнули)
-              } else {
-                console.warn(`Invalid timestamp for participant ${p.id}: ${p.last_nudge_at}`);
-              }
-            } catch (e) {
-              console.error(`Error parsing last_nudge_at for participant ${p.id}:`, e, p.last_nudge_at);
-            }
-          } else {
-            // Если в API ответе нет last_nudge_at, но есть локальное значение, сохраняем его
-            // Это важно для мгновенной блокировки после пинка, пока API не обновился
-            if (prev[p.id]) {
-              // Сохраняем локальное значение только если оно не старше часа
-              const oneHourInMs = 60 * 60 * 1000;
-              if (Date.now() - prev[p.id] < oneHourInMs) {
-                updated[p.id] = prev[p.id];
-              }
-            }
+        if (p.id !== currentUserId && p.last_nudge_at) {
+          const apiTs = new Date(p.last_nudge_at).getTime();
+          if (!isNaN(apiTs) && apiTs > 0) {
+            if (!prev[p.id] || apiTs >= prev[p.id]) updated[p.id] = apiTs;
           }
         }
       }
-      console.log("Updated nudgeTimestamps:", updated, "from API:", challengeData.participants.map(p => ({ 
-        id: p.id, 
-        last_nudge_at: p.last_nudge_at 
-      })));
       return updated;
     });
+  };
+
+  // Эффективное время последнего пинка: из API (participant.last_nudge_at) или локальное (после только что пинка)
+  const getLastNudgeTime = (p: ChallengeParticipant): number | undefined => {
+    const local = nudgeTimestamps[p.id];
+    const fromApi = p.last_nudge_at ? new Date(p.last_nudge_at).getTime() : undefined;
+    if (local && fromApi !== undefined) return Math.max(local, fromApi);
+    return local ?? (fromApi !== undefined && !isNaN(fromApi) && fromApi > 0 ? fromApi : undefined);
   };
 
   useEffect(() => {
@@ -383,9 +363,9 @@ export const ChallengePage: React.FC<Props> = ({
                   </div>
                 </div>
                 {p.id !== currentUserId && (() => {
-                  // Используем tick для пересчёта кулдауна при каждом обновлении (каждую минуту)
                   const _ = tick;
-                  const lastNudgeTime = nudgeTimestamps[p.id];
+                  // Используем те же данные, что и при проверке пинка: из списка участников (API)
+                  const lastNudgeTime = getLastNudgeTime(p);
                   const oneHourInMs = 60 * 60 * 1000;
                   const now = Date.now();
                   const canNudge = !lastNudgeTime || (now - lastNudgeTime) >= oneHourInMs;

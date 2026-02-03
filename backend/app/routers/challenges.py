@@ -186,26 +186,18 @@ def get_challenge(
                 .first()
             )
             if last_nudge:
-                last_nudge_at = last_nudge.created_at
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"Found last_nudge for user {p.user_id}: {last_nudge_at}")
+                last_nudge_at = last_nudge.created_at.isoformat()
 
-        participant_data = schemas.ChallengeDetail.Participant(
-            id=p.user.id,
-            display_name=p.user.display_name,
-            today_value=value,
-            today_completed=completed,
-            streak_current=p.streak_current,
-            last_nudge_at=last_nudge_at,
+        result_participants.append(
+            schemas.ChallengeDetail.Participant(
+                id=p.user.id,
+                display_name=p.user.display_name,
+                today_value=value,
+                today_completed=completed,
+                streak_current=p.streak_current,
+                last_nudge_at=last_nudge_at,
+            )
         )
-        result_participants.append(participant_data)
-        
-        # Логируем для отладки
-        if p.user_id != current_user.id and last_nudge_at:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Participant {p.user_id} ({p.user.display_name}): last_nudge_at={last_nudge_at}, type={type(last_nudge_at)}")
 
     return schemas.ChallengeDetail(
         id=ch.id,

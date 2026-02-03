@@ -76,8 +76,8 @@ class ChallengeDetail(BaseModel):
         today_value: int
         today_completed: bool
         streak_current: int
-        # Когда текущий пользователь последний раз пнул этого участника (для блокировки кнопки)
-        last_nudge_at: Optional[datetime] = None
+        # Когда текущий пользователь последний раз пнул этого участника (ISO строка для фронта)
+        last_nudge_at: Optional[str] = None
 
         class Config:
             from_attributes = True
