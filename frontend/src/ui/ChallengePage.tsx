@@ -474,7 +474,12 @@ export const ChallengePage: React.FC<Props> = ({
         </section>
 
         {/* Чат челленджа: сворачиваемый блок */}
-        <section className="section" style={{ paddingBottom: 24 }}>
+        <section
+          className="section"
+          style={{
+            paddingBottom: chatOpen ? 140 : 24,
+          }}
+        >
           <button
             type="button"
             className="ghost-button"
@@ -485,11 +490,62 @@ export const ChallengePage: React.FC<Props> = ({
           </button>
           {chatOpen && (
             <>
+              {/* Поле ввода и кнопка — выше списка сообщений */}
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="Сообщение…"
+                  maxLength={2000}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (chatInput.trim()) {
+                        setSendMessageLoading(true);
+                        api
+                          .postChallengeMessage(challenge.id, chatInput.trim())
+                          .then((newMsg) => {
+                            setMessages((prev) => [newMsg, ...prev]);
+                            setChatInput("");
+                          })
+                          .finally(() => setSendMessageLoading(false));
+                      }
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background: "rgba(10,12,18,0.9)",
+                    color: "#f5f6ff",
+                    fontSize: 16,
+                  }}
+                />
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={!chatInput.trim() || sendMessageLoading}
+                  onClick={() => {
+                    if (!chatInput.trim()) return;
+                    setSendMessageLoading(true);
+                    api
+                      .postChallengeMessage(challenge.id, chatInput.trim())
+                      .then((newMsg) => {
+                        setMessages((prev) => [newMsg, ...prev]);
+                        setChatInput("");
+                      })
+                      .finally(() => setSendMessageLoading(false));
+                  }}
+                >
+                  Отправить
+                </button>
+              </div>
               <div
                 style={{
                   maxHeight: 280,
                   overflowY: "auto",
-                  marginBottom: 12,
                   padding: "8px 0",
                   border: "1px solid rgba(255,255,255,0.15)",
                   borderRadius: 10,
@@ -520,71 +576,36 @@ export const ChallengePage: React.FC<Props> = ({
                       <div
                         key={m.id}
                         style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "flex-start",
                           padding: "8px 12px",
                           borderBottom: "1px solid rgba(255,255,255,0.06)",
                         }}
                       >
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
-                          {m.display_name} · {dateStr} {timeStr}
+                        <div
+                          className="avatar"
+                          style={{
+                            width: 22,
+                            height: 22,
+                            fontSize: 11,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {m.display_name.slice(0, 1).toUpperCase()}
                         </div>
-                        <div style={{ fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {m.text.length > 2000 ? m.text.slice(0, 2000) + "…" : m.text}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+                            {m.display_name} · {dateStr} {timeStr}
+                          </div>
+                          <div style={{ fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#e8eaf6" }}>
+                            {m.text.length > 2000 ? m.text.slice(0, 2000) + "…" : m.text}
+                          </div>
                         </div>
                       </div>
                     );
                   })
                 )}
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <input
-                  type="text"
-                  placeholder="Сообщение…"
-                  maxLength={2000}
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (chatInput.trim()) {
-                        setSendMessageLoading(true);
-                        api
-                          .postChallengeMessage(challenge.id, chatInput.trim())
-                          .then((newMsg) => {
-                            setMessages((prev) => [newMsg, ...prev]);
-                            setChatInput("");
-                          })
-                          .finally(() => setSendMessageLoading(false));
-                      }
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    background: "rgba(10,12,18,0.9)",
-                    color: "inherit",
-                    fontSize: 16,
-                  }}
-                />
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!chatInput.trim() || sendMessageLoading}
-                  onClick={() => {
-                    if (!chatInput.trim()) return;
-                    setSendMessageLoading(true);
-                    api
-                      .postChallengeMessage(challenge.id, chatInput.trim())
-                      .then((newMsg) => {
-                        setMessages((prev) => [newMsg, ...prev]);
-                        setChatInput("");
-                      })
-                      .finally(() => setSendMessageLoading(false));
-                  }}
-                >
-                  Отправить
-                </button>
               </div>
             </>
           )}
