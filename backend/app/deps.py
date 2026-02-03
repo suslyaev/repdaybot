@@ -13,6 +13,17 @@ SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-env")
 ALGORITHM = "HS256"
 
 
+def is_superadmin(user: User) -> bool:
+    """Суперадмин по SUPERADMIN_TELEGRAM_ID в .env (строка — Telegram ID пользователя)."""
+    raw = (os.getenv("SUPERADMIN_TELEGRAM_ID") or "").strip()
+    if not raw:
+        return False
+    try:
+        return user.telegram_id == int(raw)
+    except ValueError:
+        return False
+
+
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:

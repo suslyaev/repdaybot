@@ -8,9 +8,71 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from .. import models, schemas, telegram_bot
-from ..deps import get_current_user, get_db
+from ..deps import get_current_user, get_db, is_superadmin
 
 router = APIRouter()
+
+
+def _challenge_short_for(
+    ch: models.Challenge,
+    db: Session,
+    current_user: models.User,
+    is_participant: bool,
+) -> schemas.ChallengeShort:
+    today = date.today()
+    if not is_participant:
+        return schemas.ChallengeShort(
+            id=ch.id,
+            title=ch.title,
+            description=ch.description,
+            goal_type=ch.goal_type,
+            unit=ch.unit,
+            daily_goal=ch.daily_goal,
+            duration_days=ch.duration_days,
+            start_date=ch.start_date,
+            end_date=ch.end_date,
+            today_progress_value=None,
+            today_progress_percent=None,
+            days_completed=None,
+        )
+    dp = (
+        db.query(models.DailyProgress)
+        .filter_by(
+            challenge_id=ch.id,
+            user_id=current_user.id,
+            date=today,
+        )
+        .first()
+    )
+    value = dp.value if dp else 0
+    percent = (
+        (value / ch.daily_goal * 100.0)
+        if ch.daily_goal and ch.daily_goal > 0
+        else None
+    )
+    days_completed = (
+        db.query(func.count(models.DailyProgress.id))
+        .filter_by(
+            challenge_id=ch.id,
+            user_id=current_user.id,
+            completed=True,
+        )
+        .scalar()
+    )
+    return schemas.ChallengeShort(
+        id=ch.id,
+        title=ch.title,
+        description=ch.description,
+        goal_type=ch.goal_type,
+        unit=ch.unit,
+        daily_goal=ch.daily_goal,
+        duration_days=ch.duration_days,
+        start_date=ch.start_date,
+        end_date=ch.end_date,
+        today_progress_value=value,
+        today_progress_percent=percent,
+        days_completed=days_completed,
+    )
 
 
 @router.get("", response_model=List[schemas.ChallengeShort])
@@ -18,63 +80,30 @@ def list_my_challenges(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> list[schemas.ChallengeShort]:
-    # Все челленджи, где пользователь участник
+    if is_superadmin(current_user):
+        # Суперадмин видит все челленджи
+        challenges = db.query(models.Challenge).all()
+        participant_challenge_ids = set(
+            db.query(models.ChallengeParticipant.challenge_id)
+            .filter(models.ChallengeParticipant.user_id == current_user.id)
+            .scalars()
+            .all()
+        )
+        return [
+            _challenge_short_for(
+                ch, db, current_user,
+                is_participant=(ch.id in participant_challenge_ids),
+            )
+            for ch in challenges
+        ]
+    # Обычный пользователь: только челленджи, где участник
     q = (
         db.query(models.Challenge)
         .join(models.ChallengeParticipant)
         .filter(models.ChallengeParticipant.user_id == current_user.id)
     )
     challenges = q.all()
-
-    today = date.today()
-    result: list[schemas.ChallengeShort] = []
-    for ch in challenges:
-        # Сегодняшний прогресс
-        dp = (
-            db.query(models.DailyProgress)
-            .filter_by(
-                challenge_id=ch.id,
-                user_id=current_user.id,
-                date=today,
-            )
-            .first()
-        )
-        value = dp.value if dp else 0
-        percent = (
-            (value / ch.daily_goal * 100.0)
-            if ch.daily_goal and ch.daily_goal > 0
-            else None
-        )
-
-        # Кол-во выполненных дней
-        days_completed = (
-            db.query(func.count(models.DailyProgress.id))
-            .filter_by(
-                challenge_id=ch.id,
-                user_id=current_user.id,
-                completed=True,
-            )
-            .scalar()
-        )
-
-        result.append(
-            schemas.ChallengeShort(
-                id=ch.id,
-                title=ch.title,
-                description=ch.description,
-                goal_type=ch.goal_type,
-                unit=ch.unit,
-                daily_goal=ch.daily_goal,
-                duration_days=ch.duration_days,
-                start_date=ch.start_date,
-                end_date=ch.end_date,
-                today_progress_value=value,
-                today_progress_percent=percent,
-                days_completed=days_completed,
-            )
-        )
-
-    return result
+    return [_challenge_short_for(ch, db, current_user, True) for ch in challenges]
 
 
 @router.post("", response_model=schemas.ChallengeDetail)
@@ -144,20 +173,19 @@ def get_challenge(
     if not ch:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
-    _require_participant(challenge_id, db, current_user)
-
-    today = date.today()
-
     participants = (
         db.query(models.ChallengeParticipant)
         .filter_by(challenge_id=challenge_id)
         .all()
     )
-
-    # Определяем, является ли текущий пользователь владельцем
     me_participation = next(
         (p for p in participants if p.user_id == current_user.id), None
     )
+    is_participant = me_participant is not None
+    if not is_participant and not is_superadmin(current_user):
+        raise HTTPException(status_code=403, detail="Not a participant")
+
+    today = date.today()
     is_owner = bool(me_participation and me_participation.role == "owner")
 
     result_participants: list[schemas.ChallengeDetail.Participant] = []
@@ -176,7 +204,7 @@ def get_challenge(
         completed = dp.completed if dp else False
 
         last_nudge_at = None
-        if p.user_id != current_user.id:
+        if is_participant and p.user_id != current_user.id:
             last_nudge = (
                 db.query(models.Nudge)
                 .filter_by(
@@ -188,7 +216,6 @@ def get_challenge(
                 .first()
             )
             if last_nudge:
-                # В БД хранится UTC; отдаём фронту в МСК (Europe/Moscow) для единообразия
                 utc_dt = last_nudge.created_at
                 if utc_dt.tzinfo is None:
                     utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
@@ -206,6 +233,9 @@ def get_challenge(
             )
         )
 
+    # Для просмотра без участия (суперадмин) не отдаём invite_code
+    invite_code = ch.invite_code if is_participant else ""
+
     return schemas.ChallengeDetail(
         id=ch.id,
         title=ch.title,
@@ -217,9 +247,10 @@ def get_challenge(
         start_date=ch.start_date,
         end_date=ch.end_date,
         is_public=ch.is_public,
-        invite_code=ch.invite_code,
+        invite_code=invite_code,
         participants=result_participants,
         is_owner=is_owner,
+        is_participant=is_participant,
     )
 
 
@@ -323,52 +354,56 @@ def get_stats(
     if not ch:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
-    _require_participant(challenge_id, db, current_user)
+    is_participant = (
+        db.query(models.ChallengeParticipant)
+        .filter_by(challenge_id=challenge_id, user_id=current_user.id)
+        .first()
+        is not None
+    )
+    if not is_participant and not is_superadmin(current_user):
+        raise HTTPException(status_code=403, detail="Not a participant")
 
-    # Точки по дням для текущего пользователя
     points: list[schemas.ChallengeStats.DayPoint] = []
-    # все дни в диапазоне челленджа
-    day = ch.start_date
+    completed_days = 0
+    missed_days = 0
     today = date.today()
     last_day = min(ch.end_date, today)
 
-    completed_days = 0
-    missed_days = 0
-
-    while day <= last_day:
-        dp = (
-            db.query(models.DailyProgress)
-            .filter_by(
-                challenge_id=challenge_id,
-                user_id=current_user.id,
-                date=day,
+    if is_participant:
+        day = ch.start_date
+        while day <= last_day:
+            dp = (
+                db.query(models.DailyProgress)
+                .filter_by(
+                    challenge_id=challenge_id,
+                    user_id=current_user.id,
+                    date=day,
+                )
+                .first()
             )
-            .first()
-        )
-        if dp:
-            if ch.daily_goal and ch.daily_goal > 0:
-                percent = min(100.0, dp.value / ch.daily_goal * 100.0)
+            if dp:
+                if ch.daily_goal and ch.daily_goal > 0:
+                    percent = min(100.0, dp.value / ch.daily_goal * 100.0)
+                else:
+                    percent = 100.0 if dp.completed else 0.0
+                day_value = dp.value
             else:
-                percent = 100.0 if dp.completed else 0.0
-            day_value = dp.value
-        else:
-            percent = 0.0
-            day_value = 0
+                percent = 0.0
+                day_value = 0
 
-        if dp and dp.completed:
-            completed_days += 1
-        else:
-            missed_days += 1
+            if dp and dp.completed:
+                completed_days += 1
+            else:
+                missed_days += 1
 
-        points.append(
-            schemas.ChallengeStats.DayPoint(
-                date=day,
-                percent=percent,
-                value=day_value,
+            points.append(
+                schemas.ChallengeStats.DayPoint(
+                    date=day,
+                    percent=percent,
+                    value=day_value,
+                )
             )
-        )
-
-        day += timedelta(days=1)
+            day += timedelta(days=1)
 
     # Лидерборды по всему челленджу
     rows = (

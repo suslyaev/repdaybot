@@ -6,6 +6,7 @@ export interface UserMe {
   bot_chat_active: boolean;
   created_at: string;
   updated_at: string;
+  is_superadmin?: boolean;
 }
 
 export interface AuthState {
@@ -52,6 +53,8 @@ export interface ChallengeDetail {
   invite_code: string;
   participants: ChallengeParticipant[];
   is_owner: boolean;
+  /** false — суперадмин смотрит челлендж без участия (только описание, команда, статистика) */
+  is_participant?: boolean;
 }
 
 export interface ChallengeStats {

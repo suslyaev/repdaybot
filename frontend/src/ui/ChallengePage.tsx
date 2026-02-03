@@ -97,6 +97,8 @@ export const ChallengePage: React.FC<Props> = ({
     [challenge, currentUserId]
   );
 
+  const viewOnly = challenge?.is_participant === false;
+
   // Подгрузка сообщений чата при раскрытии блока или смене челленджа
   useEffect(() => {
     if (!chatOpen || !challenge?.id) return;
@@ -190,6 +192,7 @@ export const ChallengePage: React.FC<Props> = ({
           paddingBottom: chatOpen ? 200 : undefined,
         }}
       >
+        {!viewOnly && (
         <section className="section">
           <div className="section-title">Мой прогресс сегодня</div>
           {challenge.goal_type === "quantitative" || challenge.goal_type === "time" ? (
@@ -368,6 +371,7 @@ export const ChallengePage: React.FC<Props> = ({
             </div>
           )}
         </section>
+        )}
 
         <section className="section">
           <div className="section-title">Описание</div>
@@ -389,13 +393,15 @@ export const ChallengePage: React.FC<Props> = ({
                   <div className="row-text">
                     <div className="row-title">{p.display_name}</div>
                     <div className="row-sub">
-                      Сегодня: {p.today_value}{" "}
-                      {p.today_completed ? "(выполнил)" : ""}
+                      {viewOnly ? null : (
+                        <>Сегодня: {p.today_value}{" "}
+                        {p.today_completed ? "(выполнил)" : ""}</>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {p.id !== currentUserId && (() => {
+                  {!viewOnly && p.id !== currentUserId && (() => {
                     const _ = tick;
                     const alreadyCompletedToday = p.today_completed;
                     const lastNudgeTime = getLastNudgeTime(p);
@@ -466,7 +472,7 @@ export const ChallengePage: React.FC<Props> = ({
                       </button>
                     );
                   })()}
-                  {challenge.is_owner && p.id !== currentUserId && (
+                  {!viewOnly && challenge.is_owner && p.id !== currentUserId && (
                     <button
                       type="button"
                       className="ghost-button"
@@ -498,7 +504,8 @@ export const ChallengePage: React.FC<Props> = ({
           </div>
         </section>
 
-        {/* Чат челленджа: сворачиваемый блок */}
+        {/* Чат челленджа: только для участников */}
+        {!viewOnly && (
         <section
           className="section"
           style={{
@@ -641,18 +648,19 @@ export const ChallengePage: React.FC<Props> = ({
             </>
           )}
         </section>
+        )}
       </main>
 
       <footer className="bottombar">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             className="secondary-button"
-            style={{ flex: 1 }}
+            style={{ flex: viewOnly ? undefined : 1 }}
             onClick={onOpenStats}
           >
             Статистика
           </button>
-          {onOpenHistory && (
+          {!viewOnly && onOpenHistory && (
             <button
               className="secondary-button"
               style={{ flex: 1 }}
@@ -661,6 +669,7 @@ export const ChallengePage: React.FC<Props> = ({
               История
             </button>
           )}
+          {!viewOnly && (
           <button
             className="primary-button"
             style={{ flex: onOpenHistory ? 1 : 2 }}
@@ -675,8 +684,9 @@ export const ChallengePage: React.FC<Props> = ({
           >
             Поделиться
           </button>
+          )}
         </div>
-        {challenge.is_owner && (
+        {!viewOnly && challenge.is_owner && (
           <button
             className="ghost-button"
             style={{ marginTop: 8, width: "100%" }}

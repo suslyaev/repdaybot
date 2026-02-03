@@ -18,6 +18,7 @@ class UserMe(UserBase):
     bot_chat_active: bool
     created_at: datetime
     updated_at: datetime
+    is_superadmin: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -67,8 +68,10 @@ class ChallengeDetail(BaseModel):
     is_public: bool
     invite_code: str
 
-    # Флаг, что текущий пользователь - владелец (owner)
+    # Флаг, что текущий пользователь — владелец (owner)
     is_owner: bool
+    # False, если суперадмин смотрит челлендж без участия (только описание, команда, статистика)
+    is_participant: bool = True
 
     class Participant(BaseModel):
         id: int
