@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from typing import List
+
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -534,6 +535,85 @@ def remove_participant(
     return {"ok": True}
 
 
+# Лимит сообщений в истории и макс. длина текста
+CHAT_MESSAGE_MAX_LENGTH = 2000
+CHAT_MESSAGES_LIMIT = 100
+
+
+@router.get("/{challenge_id}/messages", response_model=List[schemas.ChallengeMessageOut])
+def get_challenge_messages(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> list:
+    """История сообщений чата челленджа. Только участники. Сверху вниз: от новых к старым."""
+    _require_participant(challenge_id, db, current_user)
+    rows = (
+        db.query(models.ChallengeMessage, models.User.display_name)
+        .join(models.User, models.ChallengeMessage.user_id == models.User.id)
+        .filter(models.ChallengeMessage.challenge_id == challenge_id)
+        .order_by(models.ChallengeMessage.created_at.desc())
+        .limit(CHAT_MESSAGES_LIMIT)
+        .all()
+    )
+    result = []
+    for msg, display_name in rows:
+        utc_dt = msg.created_at
+        if utc_dt.tzinfo is None:
+            utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+        msk_dt = utc_dt.astimezone(ZoneInfo("Europe/Moscow"))
+        result.append(
+            schemas.ChallengeMessageOut(
+                id=msg.id,
+                challenge_id=msg.challenge_id,
+                user_id=msg.user_id,
+                display_name=display_name,
+                text=msg.text[:CHAT_MESSAGE_MAX_LENGTH],
+                created_at=msk_dt.isoformat(),
+            )
+        )
+    return result
+
+
+@router.post("/{challenge_id}/messages", response_model=schemas.ChallengeMessageOut)
+def post_challenge_message(
+    challenge_id: int,
+    payload: schemas.ChallengeMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> schemas.ChallengeMessageOut:
+    """Отправить сообщение в чат челленджа. Только участники."""
+    _require_participant(challenge_id, db, current_user)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message text is required")
+    if len(text) > CHAT_MESSAGE_MAX_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Message too long (max {CHAT_MESSAGE_MAX_LENGTH} characters)",
+        )
+    msg = models.ChallengeMessage(
+        challenge_id=challenge_id,
+        user_id=current_user.id,
+        text=text,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    utc_dt = msg.created_at
+    if utc_dt.tzinfo is None:
+        utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+    msk_dt = utc_dt.astimezone(ZoneInfo("Europe/Moscow"))
+    return schemas.ChallengeMessageOut(
+        id=msg.id,
+        challenge_id=msg.challenge_id,
+        user_id=msg.user_id,
+        display_name=current_user.display_name,
+        text=msg.text,
+        created_at=msk_dt.isoformat(),
+    )
+
+
 @router.delete("/{challenge_id}")
 def delete_challenge(
     challenge_id: int,
@@ -554,6 +634,7 @@ def delete_challenge(
         raise HTTPException(status_code=403, detail="Only owner can delete challenge")
 
     # Удаляем связанные записи
+    db.query(models.ChallengeMessage).filter_by(challenge_id=challenge_id).delete()
     db.query(models.Nudge).filter_by(challenge_id=challenge_id).delete()
     db.query(models.DailyProgress).filter_by(challenge_id=challenge_id).delete()
     db.query(models.ChallengeParticipant).filter_by(challenge_id=challenge_id).delete()

@@ -48,6 +48,7 @@ class Challenge(Base):
 
     participants: Mapped[list["ChallengeParticipant"]] = relationship(back_populates="challenge")
     daily_progress: Mapped[list["DailyProgress"]] = relationship(back_populates="challenge")
+    messages: Mapped[list["ChallengeMessage"]] = relationship(back_populates="challenge")
 
 
 class ChallengeParticipant(Base):
@@ -86,6 +87,19 @@ class DailyProgress(Base):
 
     challenge: Mapped[Challenge] = relationship(back_populates="daily_progress")
     user: Mapped[User] = relationship()
+
+
+class ChallengeMessage(Base):
+    __tablename__ = "challenge_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    challenge_id: Mapped[int] = mapped_column(ForeignKey("challenges.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    text: Mapped[str] = mapped_column(String(2000))  # ограничение против спама
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    challenge: Mapped["Challenge"] = relationship(back_populates="messages")
+    user: Mapped["User"] = relationship()
 
 
 class Nudge(Base):

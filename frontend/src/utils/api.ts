@@ -1,6 +1,7 @@
 import type {
   AuthState,
   ChallengeDetail,
+  ChallengeMessage,
   ChallengeShort,
   ChallengeStats,
   UserMe,
@@ -130,6 +131,15 @@ export const api = {
   async removeParticipant(challengeId: number, userId: number): Promise<{ ok: boolean }> {
     return request<{ ok: boolean }>(`/challenges/${challengeId}/participants/${userId}`, {
       method: "DELETE",
+    });
+  },
+  async getChallengeMessages(challengeId: number): Promise<ChallengeMessage[]> {
+    return request<ChallengeMessage[]>(`/challenges/${challengeId}/messages`);
+  },
+  async postChallengeMessage(challengeId: number, text: string): Promise<ChallengeMessage> {
+    return request<ChallengeMessage>(`/challenges/${challengeId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
     });
   },
 };

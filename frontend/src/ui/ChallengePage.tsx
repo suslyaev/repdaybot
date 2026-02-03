@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { ChallengeDetail, ChallengeParticipant } from "../utils/types";
+import type { ChallengeDetail, ChallengeMessage, ChallengeParticipant } from "../utils/types";
 import { api } from "../utils/api";
 
 interface Props {
@@ -26,9 +26,13 @@ export const ChallengePage: React.FC<Props> = ({
   const [updating, setUpdating] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState("");
-  // Храним время последнего nudge для каждого пользователя: { userId: timestamp }
-  // Данные загружаются из API при загрузке челленджа
   const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>({});
+  // Чат: по умолчанию свёрнут
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState<ChallengeMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [sendMessageLoading, setSendMessageLoading] = useState(false);
 
   // Тик раз в минуту, чтобы обновлять отображаемый кулдаун и разблокировать кнопку по истечении часа
   const [tick, setTick] = useState(0);
@@ -91,6 +95,17 @@ export const ChallengePage: React.FC<Props> = ({
     () => challenge?.participants.find((p) => p.id === currentUserId),
     [challenge, currentUserId]
   );
+
+  // Подгрузка сообщений чата при раскрытии блока или смене челленджа
+  useEffect(() => {
+    if (!chatOpen || !challenge?.id) return;
+    setMessagesLoading(true);
+    api
+      .getChallengeMessages(challenge.id)
+      .then((list) => setMessages(list))
+      .catch(() => setMessages([]))
+      .finally(() => setMessagesLoading(false));
+  }, [chatOpen, challenge?.id]);
 
   const handleDelta = async (delta: number) => {
     if (!challenge) return;
@@ -456,6 +471,123 @@ export const ChallengePage: React.FC<Props> = ({
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Чат челленджа: сворачиваемый блок */}
+        <section className="section" style={{ paddingBottom: 24 }}>
+          <button
+            type="button"
+            className="ghost-button"
+            style={{ width: "100%", marginBottom: chatOpen ? 12 : 0 }}
+            onClick={() => setChatOpen((open) => !open)}
+          >
+            {chatOpen ? "Скрыть сообщения" : "Показать сообщения"}
+          </button>
+          {chatOpen && (
+            <>
+              <div
+                style={{
+                  maxHeight: 280,
+                  overflowY: "auto",
+                  marginBottom: 12,
+                  padding: "8px 0",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  borderRadius: 10,
+                  background: "rgba(0,0,0,0.2)",
+                }}
+              >
+                {messagesLoading ? (
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-secondary)" }}>
+                    Загрузка…
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-secondary)" }}>
+                    Пока нет сообщений
+                  </div>
+                ) : (
+                  messages.map((m) => {
+                    const d = new Date(m.created_at);
+                    const dateStr = d.toLocaleDateString("ru-RU", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    });
+                    const timeStr = d.toLocaleTimeString("ru-RU", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    return (
+                      <div
+                        key={m.id}
+                        style={{
+                          padding: "8px 12px",
+                          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+                          {m.display_name} · {dateStr} {timeStr}
+                        </div>
+                        <div style={{ fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {m.text.length > 2000 ? m.text.slice(0, 2000) + "…" : m.text}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <input
+                  type="text"
+                  placeholder="Сообщение…"
+                  maxLength={2000}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (chatInput.trim()) {
+                        setSendMessageLoading(true);
+                        api
+                          .postChallengeMessage(challenge.id, chatInput.trim())
+                          .then((newMsg) => {
+                            setMessages((prev) => [newMsg, ...prev]);
+                            setChatInput("");
+                          })
+                          .finally(() => setSendMessageLoading(false));
+                      }
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background: "rgba(10,12,18,0.9)",
+                    color: "inherit",
+                    fontSize: 16,
+                  }}
+                />
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={!chatInput.trim() || sendMessageLoading}
+                  onClick={() => {
+                    if (!chatInput.trim()) return;
+                    setSendMessageLoading(true);
+                    api
+                      .postChallengeMessage(challenge.id, chatInput.trim())
+                      .then((newMsg) => {
+                        setMessages((prev) => [newMsg, ...prev]);
+                        setChatInput("");
+                      })
+                      .finally(() => setSendMessageLoading(false));
+                  }}
+                >
+                  Отправить
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </main>
 

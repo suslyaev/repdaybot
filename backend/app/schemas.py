@@ -116,6 +116,22 @@ class ChallengeStats(BaseModel):
     leaderboard_by_days: list[LeaderboardItem]
 
 
+class ChallengeMessageCreate(BaseModel):
+    text: str
+
+
+class ChallengeMessageOut(BaseModel):
+    id: int
+    challenge_id: int
+    user_id: int
+    display_name: str
+    text: str
+    created_at: str  # ISO в МСК для единообразия
+
+    class Config:
+        from_attributes = True
+
+
 class AuthRequest(BaseModel):
     init_data: str
 

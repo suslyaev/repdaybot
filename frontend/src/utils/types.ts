@@ -69,3 +69,12 @@ export interface LeaderboardItem {
   completed_days: number;
 }
 
+export interface ChallengeMessage {
+  id: number;
+  challenge_id: number;
+  user_id: number;
+  display_name: string;
+  text: string;
+  created_at: string; // ISO
+}
+
