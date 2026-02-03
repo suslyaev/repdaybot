@@ -64,8 +64,23 @@ export const ChallengePage: React.FC<Props> = ({
         : undefined;
     const fromApiValid =
       fromApi !== undefined && !Number.isNaN(fromApi) && fromApi > 0 ? fromApi : undefined;
-    if (local && fromApiValid !== undefined) return Math.max(local, fromApiValid);
-    return local ?? fromApiValid;
+    
+    const result = local && fromApiValid !== undefined ? Math.max(local, fromApiValid) : (local ?? fromApiValid);
+    
+    // Отладка для участников с last_nudge_at
+    if (lastNudgeAtRaw && p.id <= 15) {
+      const hoursAgo = fromApiValid ? (Date.now() - fromApiValid) / (60 * 60 * 1000) : null;
+      console.log(
+        `getLastNudgeTime(${p.display_name}):`,
+        `raw="${lastNudgeAtRaw}"`,
+        `parsed=${fromApi}`,
+        `valid=${fromApiValid}`,
+        `hoursAgo=${hoursAgo?.toFixed(2) ?? 'N/A'}`,
+        `result=${result}`
+      );
+    }
+    
+    return result;
   };
 
   useEffect(() => {
@@ -389,6 +404,18 @@ export const ChallengePage: React.FC<Props> = ({
                   const minutesUntilNext = lastNudgeTime && (now - lastNudgeTime) < oneHourInMs
                     ? Math.max(1, Math.ceil((oneHourInMs - (now - lastNudgeTime)) / 60000))
                     : 0;
+                  
+                  // Отладка для участников с last_nudge_at
+                  if (p.last_nudge_at && p.id <= 15) {
+                    const hoursAgo = lastNudgeTime ? (now - lastNudgeTime) / (60 * 60 * 1000) : null;
+                    console.log(
+                      `Button(${p.display_name}):`,
+                      `lastNudgeTime=${lastNudgeTime}`,
+                      `hoursAgo=${hoursAgo?.toFixed(2) ?? 'N/A'}`,
+                      `canNudge=${canNudge}`,
+                      `minutesUntilNext=${minutesUntilNext}`
+                    );
+                  }
 
                   return (
                     <button
