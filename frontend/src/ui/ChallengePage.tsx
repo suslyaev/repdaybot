@@ -27,42 +27,8 @@ export const ChallengePage: React.FC<Props> = ({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState("");
   // Храним время последнего nudge для каждого пользователя: { userId: timestamp }
-  // Используем sessionStorage для сохранения между перезаходами в мини-апп
-  const getStoredNudgeTimestamps = (): Record<number, number> => {
-    try {
-      const stored = sessionStorage.getItem(`nudgeTimestamps_${challengeId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Проверяем, что значения не старше часа (чтобы не блокировать вечно)
-        const oneHourInMs = 60 * 60 * 1000;
-        const now = Date.now();
-        const filtered: Record<number, number> = {};
-        for (const [userId, timestamp] of Object.entries(parsed)) {
-          const ts = Number(timestamp);
-          if (now - ts < oneHourInMs) {
-            filtered[Number(userId)] = ts;
-          }
-        }
-        return filtered;
-      }
-    } catch (e) {
-      // Игнорируем ошибки парсинга
-    }
-    return {};
-  };
-
-  const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>(
-    getStoredNudgeTimestamps()
-  );
-
-  // Сохраняем в sessionStorage при каждом изменении
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(`nudgeTimestamps_${challengeId}`, JSON.stringify(nudgeTimestamps));
-    } catch (e) {
-      // Игнорируем ошибки сохранения (например, если sessionStorage недоступен)
-    }
-  }, [nudgeTimestamps, challengeId]);
+  // Данные загружаются из API при загрузке челленджа
+  const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>({});
 
   // Тик раз в минуту, чтобы обновлять отображаемый кулдаун и разблокировать кнопку по истечении часа
   const [tick, setTick] = useState(0);
@@ -72,51 +38,47 @@ export const ChallengePage: React.FC<Props> = ({
   }, []);
 
   // Функция для обновления nudgeTimestamps из данных челленджа
-  // Сохраняет существующие локальные значения, если они новее или если в API ответе нет данных
-  const updateNudgeTimestamps = (challengeData: ChallengeDetail, merge: boolean = true) => {
-    if (merge) {
-      // Merge режим: сохраняем локальные значения, если они новее
-      setNudgeTimestamps((prev) => {
-        const updated = { ...prev };
-        for (const p of challengeData.participants) {
-          if (p.id !== currentUserId) {
-            if (p.last_nudge_at != null && p.last_nudge_at !== "") {
-              try {
-                const apiTimestamp = new Date(p.last_nudge_at).getTime();
-                if (!isNaN(apiTimestamp) && apiTimestamp > 0) {
-                  // Используем значение из API только если его нет локально или оно новее
-                  const localTimestamp = prev[p.id];
-                  if (!localTimestamp || apiTimestamp > localTimestamp) {
-                    updated[p.id] = apiTimestamp;
-                  }
+  // Использует данные из API, но сохраняет локальные значения если они новее (для мгновенной блокировки после пинка)
+  const updateNudgeTimestamps = (challengeData: ChallengeDetail) => {
+    setNudgeTimestamps((prev) => {
+      const updated = { ...prev };
+      for (const p of challengeData.participants) {
+        if (p.id !== currentUserId) {
+          if (p.last_nudge_at != null && p.last_nudge_at !== "") {
+            try {
+              const apiTimestamp = new Date(p.last_nudge_at).getTime();
+              if (!isNaN(apiTimestamp) && apiTimestamp > 0) {
+                // Используем значение из API, но сохраняем локальное если оно новее (для мгновенной блокировки)
+                const localTimestamp = prev[p.id];
+                if (!localTimestamp || apiTimestamp >= localTimestamp) {
+                  updated[p.id] = apiTimestamp;
                 }
-              } catch (e) {
-                // Игнорируем ошибки парсинга даты
+                // Если localTimestamp новее, оставляем его (это может быть если только что пнули)
+              } else {
+                console.warn(`Invalid timestamp for participant ${p.id}: ${p.last_nudge_at}`);
+              }
+            } catch (e) {
+              console.error(`Error parsing last_nudge_at for participant ${p.id}:`, e, p.last_nudge_at);
+            }
+          } else {
+            // Если в API ответе нет last_nudge_at, но есть локальное значение, сохраняем его
+            // Это важно для мгновенной блокировки после пинка, пока API не обновился
+            if (prev[p.id]) {
+              // Сохраняем локальное значение только если оно не старше часа
+              const oneHourInMs = 60 * 60 * 1000;
+              if (Date.now() - prev[p.id] < oneHourInMs) {
+                updated[p.id] = prev[p.id];
               }
             }
-            // Если в API ответе нет last_nudge_at, сохраняем локальное значение (если есть)
-            // Это важно, чтобы не потерять локально сохраненное время после пинка
-          }
-        }
-        return updated;
-      });
-    } else {
-      // Режим полной замены: используется только при первой загрузке
-      const timestamps: Record<number, number> = {};
-      for (const p of challengeData.participants) {
-        if (p.id !== currentUserId && p.last_nudge_at != null && p.last_nudge_at !== "") {
-          try {
-            const timestamp = new Date(p.last_nudge_at).getTime();
-            if (!isNaN(timestamp) && timestamp > 0) {
-              timestamps[p.id] = timestamp;
-            }
-          } catch (e) {
-            // Игнорируем ошибки парсинга даты
           }
         }
       }
-      setNudgeTimestamps(timestamps);
-    }
+      console.log("Updated nudgeTimestamps:", updated, "from API:", challengeData.participants.map(p => ({ 
+        id: p.id, 
+        last_nudge_at: p.last_nudge_at 
+      })));
+      return updated;
+    });
   };
 
   useEffect(() => {
@@ -126,14 +88,7 @@ export const ChallengePage: React.FC<Props> = ({
         const data = await api.getChallengeDetail(challengeId);
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
-        // Используем merge режим, чтобы сохранить значения из sessionStorage, если они новее
-        // Проверяем, что приходит с API
-        console.log("Challenge loaded, participants:", data.participants.map(p => ({ 
-          id: p.id, 
-          name: p.display_name, 
-          last_nudge_at: p.last_nudge_at 
-        })));
-        updateNudgeTimestamps(data, true);
+        updateNudgeTimestamps(data);
       } finally {
         setLoading(false);
       }
