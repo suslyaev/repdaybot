@@ -1,5 +1,6 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, case
@@ -186,13 +187,12 @@ def get_challenge(
                 .first()
             )
             if last_nudge:
-                last_nudge_at = last_nudge.created_at.isoformat()
-                logger = __import__("logging").getLogger(__name__)
-                logger.info(
-                    "get_challenge: last_nudge for to_user_id=%s: %s",
-                    p.user_id,
-                    last_nudge_at,
-                )
+                # В БД хранится UTC; отдаём фронту в МСК (Europe/Moscow) для единообразия
+                utc_dt = last_nudge.created_at
+                if utc_dt.tzinfo is None:
+                    utc_dt = utc_dt.replace(tzinfo=ZoneInfo("UTC"))
+                msk_dt = utc_dt.astimezone(ZoneInfo("Europe/Moscow"))
+                last_nudge_at = msk_dt.isoformat()
 
         result_participants.append(
             schemas.ChallengeDetail.Participant(

@@ -65,22 +65,11 @@ export const ChallengePage: React.FC<Props> = ({
     const fromApiValid =
       fromApi !== undefined && !Number.isNaN(fromApi) && fromApi > 0 ? fromApi : undefined;
     
-    const result = local && fromApiValid !== undefined ? Math.max(local, fromApiValid) : (local ?? fromApiValid);
-    
-    // Отладка для участников с last_nudge_at
-    if (lastNudgeAtRaw && p.id <= 15) {
-      const hoursAgo = fromApiValid ? (Date.now() - fromApiValid) / (60 * 60 * 1000) : null;
-      console.log(
-        `getLastNudgeTime(${p.display_name}):`,
-        `raw="${lastNudgeAtRaw}"`,
-        `parsed=${fromApi}`,
-        `valid=${fromApiValid}`,
-        `hoursAgo=${hoursAgo?.toFixed(2) ?? 'N/A'}`,
-        `result=${result}`
-      );
+    // Используем более новое значение: локальное (если только что пнули) или из API
+    if (local && fromApiValid !== undefined) {
+      return Math.max(local, fromApiValid);
     }
-    
-    return result;
+    return local ?? fromApiValid;
   };
 
   useEffect(() => {
@@ -88,16 +77,6 @@ export const ChallengePage: React.FC<Props> = ({
       setLoading(true);
       try {
         const data = await api.getChallengeDetail(challengeId);
-        // Отладка: что пришло с API по last_nudge_at
-        console.log(
-          "Challenge detail loaded, participants:",
-          data.participants.map((q) => ({
-            id: q.id,
-            name: q.display_name,
-            last_nudge_at: q.last_nudge_at,
-            has_key: "last_nudge_at" in (q as Record<string, unknown>),
-          }))
-        );
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
         updateNudgeTimestamps(data);
@@ -400,22 +379,11 @@ export const ChallengePage: React.FC<Props> = ({
                   const lastNudgeTime = getLastNudgeTime(p);
                   const oneHourInMs = 60 * 60 * 1000;
                   const now = Date.now();
-                  const canNudge = !lastNudgeTime || (now - lastNudgeTime) >= oneHourInMs;
-                  const minutesUntilNext = lastNudgeTime && (now - lastNudgeTime) < oneHourInMs
-                    ? Math.max(1, Math.ceil((oneHourInMs - (now - lastNudgeTime)) / 60000))
+                  const timeSinceNudge = lastNudgeTime ? now - lastNudgeTime : Infinity;
+                  const canNudge = !lastNudgeTime || timeSinceNudge >= oneHourInMs;
+                  const minutesUntilNext = lastNudgeTime && timeSinceNudge < oneHourInMs
+                    ? Math.max(1, Math.ceil((oneHourInMs - timeSinceNudge) / 60000))
                     : 0;
-                  
-                  // Отладка для участников с last_nudge_at
-                  if (p.last_nudge_at && p.id <= 15) {
-                    const hoursAgo = lastNudgeTime ? (now - lastNudgeTime) / (60 * 60 * 1000) : null;
-                    console.log(
-                      `Button(${p.display_name}):`,
-                      `lastNudgeTime=${lastNudgeTime}`,
-                      `hoursAgo=${hoursAgo?.toFixed(2) ?? 'N/A'}`,
-                      `canNudge=${canNudge}`,
-                      `minutesUntilNext=${minutesUntilNext}`
-                    );
-                  }
 
                   return (
                     <button
