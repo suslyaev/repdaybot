@@ -34,6 +34,8 @@ export interface ChallengeParticipant {
   today_value: number;
   today_completed: boolean;
   streak_current: number;
+  /** Когда текущий пользователь последний раз пнул этого участника (ISO) */
+  last_nudge_at?: string | null;
 }
 
 export interface ChallengeDetail {

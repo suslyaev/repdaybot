@@ -28,6 +28,12 @@ export const ChallengePage: React.FC<Props> = ({
   const [customValue, setCustomValue] = useState("");
   // Храним время последнего nudge для каждого пользователя: { userId: timestamp }
   const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>({});
+  // Тик раз в минуту, чтобы обновлять отображаемый кулдаун и разблокировать кнопку по истечении часа
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -35,12 +41,20 @@ export const ChallengePage: React.FC<Props> = ({
       try {
         const data = await api.getChallengeDetail(challengeId);
         setChallenge(data);
+        // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
+        const timestamps: Record<number, number> = {};
+        for (const p of data.participants) {
+          if (p.id !== currentUserId && p.last_nudge_at) {
+            timestamps[p.id] = new Date(p.last_nudge_at).getTime();
+          }
+        }
+        setNudgeTimestamps(timestamps);
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [challengeId]);
+  }, [challengeId, currentUserId]);
 
   const me = useMemo(
     () => challenge?.participants.find((p) => p.id === currentUserId),

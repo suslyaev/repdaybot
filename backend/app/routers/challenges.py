@@ -172,6 +172,22 @@ def get_challenge(
         )
         value = dp.value if dp else 0
         completed = dp.completed if dp else False
+
+        last_nudge_at = None
+        if p.user_id != current_user.id:
+            last_nudge = (
+                db.query(models.Nudge)
+                .filter_by(
+                    challenge_id=challenge_id,
+                    from_user_id=current_user.id,
+                    to_user_id=p.user_id,
+                )
+                .order_by(models.Nudge.created_at.desc())
+                .first()
+            )
+            if last_nudge:
+                last_nudge_at = last_nudge.created_at
+
         result_participants.append(
             schemas.ChallengeDetail.Participant(
                 id=p.user.id,
@@ -179,6 +195,7 @@ def get_challenge(
                 today_value=value,
                 today_completed=completed,
                 streak_current=p.streak_current,
+                last_nudge_at=last_nudge_at,
             )
         )
 
