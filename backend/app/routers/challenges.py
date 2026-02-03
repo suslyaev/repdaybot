@@ -83,12 +83,12 @@ def list_my_challenges(
     if is_superadmin(current_user):
         # Суперадмин видит все челленджи
         challenges = db.query(models.Challenge).all()
-        participant_challenge_ids = set(
-            db.query(models.ChallengeParticipant.challenge_id)
+        participant_challenge_ids = {
+            row[0]
+            for row in db.query(models.ChallengeParticipant.challenge_id)
             .filter(models.ChallengeParticipant.user_id == current_user.id)
-            .scalars()
             .all()
-        )
+        }
         return [
             _challenge_short_for(
                 ch, db, current_user,
