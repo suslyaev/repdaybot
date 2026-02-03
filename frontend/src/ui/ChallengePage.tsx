@@ -449,7 +449,7 @@ export const ChallengePage: React.FC<Props> = ({
                         }
                       }}
                     >
-                      Исключить
+                      х
                     </button>
                   )}
                 </div>
