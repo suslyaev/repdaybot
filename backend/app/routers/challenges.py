@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, case
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .. import models, schemas, telegram_bot
 from ..deps import get_current_user, get_db, is_superadmin
@@ -169,12 +169,27 @@ def get_challenge(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.ChallengeDetail:
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        return _get_challenge_impl(challenge_id, db, current_user)
+    except Exception as e:
+        logger.exception("get_challenge failed: %s", e)
+        raise
+
+
+def _get_challenge_impl(
+    challenge_id: int,
+    db: Session,
+    current_user: models.User,
+) -> schemas.ChallengeDetail:
     ch = db.get(models.Challenge, challenge_id)
     if not ch:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
     participants = (
         db.query(models.ChallengeParticipant)
+        .options(joinedload(models.ChallengeParticipant.user))
         .filter_by(challenge_id=challenge_id)
         .all()
     )
@@ -191,6 +206,8 @@ def get_challenge(
     result_participants: list[schemas.ChallengeDetail.Participant] = []
 
     for p in participants:
+        if p.user is None:
+            continue
         dp = (
             db.query(models.DailyProgress)
             .filter_by(
