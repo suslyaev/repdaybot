@@ -359,9 +359,10 @@ export const ChallengePage: React.FC<Props> = ({
                   const _ = tick;
                   const lastNudgeTime = nudgeTimestamps[p.id];
                   const oneHourInMs = 60 * 60 * 1000;
-                  const canNudge = !lastNudgeTime || (Date.now() - lastNudgeTime) >= oneHourInMs;
-                  const minutesUntilNext = lastNudgeTime 
-                    ? Math.ceil((oneHourInMs - (Date.now() - lastNudgeTime)) / 60000)
+                  const now = Date.now();
+                  const canNudge = !lastNudgeTime || (now - lastNudgeTime) >= oneHourInMs;
+                  const minutesUntilNext = lastNudgeTime && (now - lastNudgeTime) < oneHourInMs
+                    ? Math.max(1, Math.ceil((oneHourInMs - (now - lastNudgeTime)) / 60000))
                     : 0;
 
                   return (
@@ -377,10 +378,18 @@ export const ChallengePage: React.FC<Props> = ({
 
                         try {
                           const result = await api.sendNudge(challenge.id, p.id);
+                          // Сразу сохраняем время пинка локально, чтобы кнопка заблокировалась мгновенно
+                          const now = Date.now();
+                          setNudgeTimestamps((prev) => ({
+                            ...prev,
+                            [p.id]: now,
+                          }));
+                          
                           // Обновляем челлендж, чтобы получить актуальные данные включая last_nudge_at
                           const fresh = await api.getChallengeDetail(challenge.id);
                           setChallenge(fresh);
-                          updateNudgeTimestamps(fresh); // Обновляем кулдаун пинков из ответа API
+                          // Синхронизируем с данными из API (на случай если время на сервере отличается)
+                          updateNudgeTimestamps(fresh);
                           
                           // Показываем уведомление через Telegram WebApp
                           window.Telegram?.WebApp.showAlert?.(
