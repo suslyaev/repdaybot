@@ -27,7 +27,43 @@ export const ChallengePage: React.FC<Props> = ({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState("");
   // Храним время последнего nudge для каждого пользователя: { userId: timestamp }
-  const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>({});
+  // Используем sessionStorage для сохранения между перезаходами в мини-апп
+  const getStoredNudgeTimestamps = (): Record<number, number> => {
+    try {
+      const stored = sessionStorage.getItem(`nudgeTimestamps_${challengeId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Проверяем, что значения не старше часа (чтобы не блокировать вечно)
+        const oneHourInMs = 60 * 60 * 1000;
+        const now = Date.now();
+        const filtered: Record<number, number> = {};
+        for (const [userId, timestamp] of Object.entries(parsed)) {
+          const ts = Number(timestamp);
+          if (now - ts < oneHourInMs) {
+            filtered[Number(userId)] = ts;
+          }
+        }
+        return filtered;
+      }
+    } catch (e) {
+      // Игнорируем ошибки парсинга
+    }
+    return {};
+  };
+
+  const [nudgeTimestamps, setNudgeTimestamps] = useState<Record<number, number>>(
+    getStoredNudgeTimestamps()
+  );
+
+  // Сохраняем в sessionStorage при каждом изменении
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`nudgeTimestamps_${challengeId}`, JSON.stringify(nudgeTimestamps));
+    } catch (e) {
+      // Игнорируем ошибки сохранения (например, если sessionStorage недоступен)
+    }
+  }, [nudgeTimestamps, challengeId]);
+
   // Тик раз в минуту, чтобы обновлять отображаемый кулдаун и разблокировать кнопку по истечении часа
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -90,8 +126,14 @@ export const ChallengePage: React.FC<Props> = ({
         const data = await api.getChallengeDetail(challengeId);
         setChallenge(data);
         // Инициализируем кулдаун пинков из ответа API, чтобы кнопка оставалась заблокированной после выхода/входа
-        // Используем режим полной замены при первой загрузке
-        updateNudgeTimestamps(data, false);
+        // Используем merge режим, чтобы сохранить значения из sessionStorage, если они новее
+        // Проверяем, что приходит с API
+        console.log("Challenge loaded, participants:", data.participants.map(p => ({ 
+          id: p.id, 
+          name: p.display_name, 
+          last_nudge_at: p.last_nudge_at 
+        })));
+        updateNudgeTimestamps(data, true);
       } finally {
         setLoading(false);
       }
