@@ -217,8 +217,9 @@ def _get_challenge_impl(
             )
             .first()
         )
-        value = dp.value if dp else 0
-        completed = dp.completed if dp else False
+        value = int(dp.value) if dp else 0
+        completed = bool(dp.completed) if dp else False
+        streak_current = int(p.streak_current) if p.streak_current is not None else 0
 
         last_nudge_at = None
         if is_participant and p.user_id != current_user.id:
@@ -242,10 +243,10 @@ def _get_challenge_impl(
         result_participants.append(
             schemas.ChallengeDetail.Participant(
                 id=p.user.id,
-                display_name=p.user.display_name,
+                display_name=p.user.display_name or "",
                 today_value=value,
                 today_completed=completed,
-                streak_current=p.streak_current,
+                streak_current=streak_current,
                 last_nudge_at=last_nudge_at,
             )
         )
