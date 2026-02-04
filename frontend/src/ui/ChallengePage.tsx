@@ -446,6 +446,8 @@ export const ChallengePage: React.FC<Props> = ({
                               window.Telegram?.WebApp.showAlert?.(
                                 `Слишком часто! Можно пнуть не чаще раза в час. Попробуйте через ${minutes} мин.`
                               );
+                            } else if (errorMsg.includes("nudge_sender_no_progress_today")) {
+                              window.Telegram?.WebApp.showAlert?.("Начни с себя");
                             } else if (errorMsg.includes("recent_progress_update")) {
                               window.Telegram?.WebApp.showAlert?.("Себя пни и выполняй челлендж");
                             } else if (errorMsg.includes("already_completed_today")) {

@@ -503,6 +503,22 @@ def send_nudge(
 
     today = date.today()
 
+    # Нельзя пнуть, если отправитель сам ещё не трогал свой прогресс сегодня
+    sender_today = (
+        db.query(models.DailyProgress)
+        .filter_by(
+            challenge_id=challenge_id,
+            user_id=current_user.id,
+            date=today,
+        )
+        .first()
+    )
+    if not sender_today:
+        raise HTTPException(
+            status_code=400,
+            detail="nudge_sender_no_progress_today",
+        )
+
     # Нельзя пнуть того, кто уже выполнил цель сегодня
     target_today = (
         db.query(models.DailyProgress)
